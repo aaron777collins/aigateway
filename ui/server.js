@@ -220,6 +220,58 @@ app.get('/api/health/models', async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// POST /api/models
+// Fetches available models from a provider endpoint.
+// Body: { type: "ollama"|"openrouter"|"custom", api_base?: string, api_key?: string }
+// ---------------------------------------------------------------------------
+app.post('/api/models', async (req, res) => {
+  const { type, api_base, api_key } = req.body;
+  try {
+    let models = [];
+    if (type === 'ollama') {
+      const url = (api_base || 'http://host.docker.internal:11434') + '/api/tags';
+      const r = await fetch(url, { timeout: 10_000 });
+      const data = await r.json();
+      models = (data.models || []).map(m => ({
+        id: `ollama/${m.name}`,
+        name: m.name,
+        size: m.details?.parameter_size || '',
+        provider: 'ollama',
+      }));
+    } else if (type === 'openrouter') {
+      const r = await fetch('https://openrouter.ai/api/v1/models', {
+        timeout: 10_000,
+        headers: api_key ? { Authorization: `Bearer ${api_key}` } : {},
+      });
+      const data = await r.json();
+      models = (data.data || [])
+        .filter(m => m.id && m.id.endsWith(':free'))
+        .map(m => ({
+          id: `openrouter/${m.id}`,
+          name: m.id,
+          context: m.context_length || '',
+          provider: 'openrouter',
+        }));
+    } else {
+      const url = (api_base || '').replace(/\/+$/, '') + '/models';
+      const headers = {};
+      if (api_key) headers.Authorization = `Bearer ${api_key}`;
+      const r = await fetch(url, { timeout: 10_000, headers });
+      const data = await r.json();
+      models = (data.data || data.models || []).map(m => ({
+        id: m.id || m.name,
+        name: m.id || m.name,
+        provider: 'custom',
+      }));
+    }
+    res.json({ ok: true, models });
+  } catch (err) {
+    console.error('[POST /api/models]', err.message);
+    res.status(500).json({ ok: false, error: err.message, models: [] });
+  }
+});
+
+// ---------------------------------------------------------------------------
 // Start
 // ---------------------------------------------------------------------------
 app.listen(PORT, '0.0.0.0', () => {

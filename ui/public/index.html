@@ -659,6 +659,39 @@
     }
 
     /* -----------------------------------------------------------------------
+       Model search dropdown
+    ----------------------------------------------------------------------- */
+    .search-results {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: var(--bg-card);
+      border: 1px solid var(--border-hover);
+      border-radius: var(--radius-sm);
+      max-height: 220px;
+      overflow-y: auto;
+      z-index: 200;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    }
+    .search-item {
+      padding: 0.5rem 0.75rem;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.85rem;
+      border-bottom: 1px solid var(--border);
+      transition: background var(--transition);
+    }
+    .search-item:last-child { border-bottom: none; }
+    .search-item:hover { background: var(--accent-dim); }
+    .search-item-name { color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; }
+    .search-item-meta { color: var(--text-muted); font-size: 0.75rem; }
+    .search-loading { padding: 0.75rem; text-align: center; color: var(--text-muted); font-size: 0.85rem; }
+    .search-empty { padding: 0.75rem; text-align: center; color: var(--text-muted); font-size: 0.85rem; }
+
+    /* -----------------------------------------------------------------------
        Scrollbar (webkit)
     ----------------------------------------------------------------------- */
     ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -747,9 +780,11 @@
         <option value="custom">Custom / OpenAI-compatible</option>
       </select>
     </div>
-    <div class="form-group">
+    <div class="form-group" style="position:relative">
       <label class="form-label">Model identifier</label>
-      <input class="form-input" id="mm-model" type="text" placeholder="e.g. ollama/gemma4:31b" />
+      <input class="form-input" id="mm-model" type="text" placeholder="e.g. ollama/gemma4:31b — type to search" autocomplete="off" oninput="App.onModelSearch()" onfocus="App.onModelSearch()" />
+      <div id="mm-search-results" class="search-results" style="display:none"></div>
+      <button class="btn btn-ghost btn-sm" style="margin-top:0.4rem;font-size:0.8rem" onclick="App.fetchProviderModels()">Load available models from provider</button>
     </div>
     <div class="form-group" id="mm-apibase-group">
       <label class="form-label">API Base URL</label>
@@ -1362,6 +1397,68 @@ const App = {
     this.openModal('model-modal');
   },
 
+  _availableModels: [],
+
+  async fetchProviderModels() {
+    const provider = document.getElementById('mm-provider').value;
+    const apiBase  = document.getElementById('mm-apibase').value.trim();
+    const apiKey   = document.getElementById('mm-apikey').value.trim();
+    const results  = document.getElementById('mm-search-results');
+    results.style.display = '';
+    results.innerHTML = '<div class="search-loading">Loading models...</div>';
+    try {
+      const r = await fetch('/api/models', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: provider, api_base: apiBase, api_key: apiKey }),
+      });
+      const data = await r.json();
+      this._availableModels = data.models || [];
+      Toast.show(`Loaded ${this._availableModels.length} models`, 'success');
+      this.onModelSearch();
+    } catch (e) {
+      results.innerHTML = '<div class="search-empty">Failed to load models</div>';
+      this._availableModels = [];
+    }
+  },
+
+  onModelSearch() {
+    const query   = document.getElementById('mm-model').value.trim().toLowerCase();
+    const results = document.getElementById('mm-search-results');
+    if (!this._availableModels.length) {
+      results.style.display = 'none';
+      return;
+    }
+    let filtered = this._availableModels;
+    if (query) {
+      filtered = this._availableModels.filter(m => {
+        const name = (m.name || m.id || '').toLowerCase();
+        return query.split('').every((ch, i, arr) => {
+          const idx = name.indexOf(ch, i === 0 ? 0 : name.indexOf(arr[i-1]) + 1);
+          return idx >= 0;
+        }) || name.includes(query);
+      });
+    }
+    if (!filtered.length) {
+      results.style.display = '';
+      results.innerHTML = '<div class="search-empty">No matching models</div>';
+      return;
+    }
+    results.style.display = '';
+    results.innerHTML = filtered.slice(0, 30).map(m => {
+      const meta = m.size || (m.context ? `${m.context} ctx` : '') || '';
+      return `<div class="search-item" onclick="App.selectModel('${m.id.replace(/'/g, "\\'")}')">
+        <span class="search-item-name">${m.name || m.id}</span>
+        ${meta ? `<span class="search-item-meta">${meta}</span>` : ''}
+      </div>`;
+    }).join('');
+  },
+
+  selectModel(id) {
+    document.getElementById('mm-model').value = id;
+    document.getElementById('mm-search-results').style.display = 'none';
+  },
+
   onProviderChange() {
     const provider = document.getElementById('mm-provider').value;
     const apibaseGroup = document.getElementById('mm-apibase-group');
@@ -1444,15 +1541,19 @@ const App = {
     const type = document.getElementById('pm-type').value;
     const apibaseGroup = document.getElementById('pm-apibase-group');
     const apikeyGroup  = document.getElementById('pm-apikey-group');
+    const apikeyLabel  = apikeyGroup.querySelector('.form-label');
+    // Always show API key field — optional for Ollama, required for others
+    apikeyGroup.style.display = '';
     if (type === 'ollama') {
       apibaseGroup.style.display = '';
-      apikeyGroup.style.display  = 'none';
+      if (apikeyLabel) apikeyLabel.textContent = 'API Key (optional)';
+      document.getElementById('pm-apibase').value = 'http://host.docker.internal:11434';
     } else if (type === 'openrouter' || type === 'groq') {
       apibaseGroup.style.display = 'none';
-      apikeyGroup.style.display  = '';
+      if (apikeyLabel) apikeyLabel.textContent = 'API Key';
     } else {
       apibaseGroup.style.display = '';
-      apikeyGroup.style.display  = '';
+      if (apikeyLabel) apikeyLabel.textContent = 'API Key';
     }
   },
 
@@ -1466,12 +1567,8 @@ const App = {
       Toast.show('Provider name is required', 'error');
       return;
     }
-    if (type === 'ollama' && !apiBase) {
-      Toast.show('API Base URL is required for Ollama', 'error');
-      return;
-    }
-    if ((type === 'openrouter' || type === 'groq') && !apiKey) {
-      Toast.show('API Key is required for this provider', 'error');
+    if ((type === 'ollama' || type === 'custom') && !apiBase) {
+      Toast.show('API Base URL is required for this provider', 'error');
       return;
     }
 
@@ -1582,6 +1679,13 @@ document.querySelectorAll('.overlay').forEach(overlay => {
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     document.querySelectorAll('.overlay.open').forEach(o => o.classList.remove('open'));
+  }
+});
+
+document.addEventListener('click', (e) => {
+  const sr = document.getElementById('mm-search-results');
+  if (sr && !e.target.closest('#mm-model') && !e.target.closest('#mm-search-results') && !e.target.closest('[onclick*="fetchProviderModels"]')) {
+    sr.style.display = 'none';
   }
 });
 

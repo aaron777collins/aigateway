@@ -45,6 +45,8 @@ services:
       LITELLM_CONTAINER: aigateway-litellm
       LITELLM_KEY: "${LITELLM_MASTER_KEY}"
       PORT: "4002"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - litellm
     networks:

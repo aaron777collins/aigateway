@@ -76,14 +76,12 @@ function validateConfig(cfg) {
  * so a crash mid-write never corrupts the live config.
  */
 function writeConfig(cfg) {
-  const tmp = CONFIG_PATH + '.tmp';
   const content = yaml.dump(cfg, {
     lineWidth: 120,
     noRefs: true,
     quotingType: '"',
   });
-  fs.writeFileSync(tmp, content, 'utf8');
-  fs.renameSync(tmp, CONFIG_PATH);
+  fs.writeFileSync(CONFIG_PATH, content, 'utf8');
 }
 
 /**

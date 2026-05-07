@@ -1,0 +1,181 @@
+general_settings:
+  master_key: "YOUR_LITELLM_MASTER_KEY"
+
+litellm_settings:
+  num_retries: 0
+  request_timeout: 30
+  fallbacks:
+    # SMART chain: glm-cloud → qwen-coder → gpt-oss-120b → gemma31b-cloud → gemma31b-or → gemma31b-local → gemma26b-local
+    - smart: [smart-2]
+    - smart-2: [smart-3]
+    - smart-3: [smart-4]
+    - smart-4: [smart-5]
+    - smart-5: [smart-6]
+    - smart-6: [smart-7]
+
+    # NORMAL chain: qwen-80b → gemma31b-or → gemma26b-or → gemma31b-cloud → gemma31b-local → gemma26b-local → e2b-local
+    - normal: [normal-2]
+    - normal-2: [normal-3]
+    - normal-3: [normal-4]
+    - normal-4: [normal-5]
+    - normal-5: [normal-6]
+    - normal-6: [normal-7]
+
+    # FAST chain: gemma26b-or → gpt-oss-20b → e2b-local → hermes3 → llama32
+    - fast: [fast-2]
+    - fast-2: [fast-3]
+    - fast-3: [fast-4]
+    - fast-4: [fast-5]
+
+model_list:
+  # ============================================================
+  # SMART TIER - Smartest models first
+  # Priority: Ollama Cloud (best) → OpenRouter free (fast) → Ollama Local (slow but reliable)
+  # ============================================================
+  - model_name: smart
+    litellm_params:
+      model: ollama/glm-5.1:cloud
+      api_base: http://host.docker.internal:11434
+      stream: true
+      timeout: 30
+
+  - model_name: smart-2
+    litellm_params:
+      model: openrouter/qwen/qwen3-coder:free
+      api_key: "YOUR_OPENROUTER_API_KEY"
+      stream: true
+      timeout: 30
+
+  - model_name: smart-3
+    litellm_params:
+      model: openrouter/openai/gpt-oss-120b:free
+      api_key: "YOUR_OPENROUTER_API_KEY"
+      stream: true
+      timeout: 30
+
+  - model_name: smart-4
+    litellm_params:
+      model: ollama/gemma4:31b-cloud
+      api_base: http://host.docker.internal:11434
+      stream: true
+      timeout: 30
+
+  - model_name: smart-5
+    litellm_params:
+      model: openrouter/google/gemma-4-31b-it:free
+      api_key: "YOUR_OPENROUTER_API_KEY"
+      stream: true
+      timeout: 30
+
+  - model_name: smart-6
+    litellm_params:
+      model: ollama/gemma4:31b
+      api_base: http://host.docker.internal:11434
+      stream: true
+      timeout: 600
+
+  - model_name: smart-7
+    litellm_params:
+      model: ollama/gemma4:26b
+      api_base: http://host.docker.internal:11434
+      stream: true
+      timeout: 600
+
+  # ============================================================
+  # NORMAL TIER - Balanced models
+  # Priority: OpenRouter free first (fast!), then Ollama cloud, then local
+  # ============================================================
+  - model_name: normal
+    litellm_params:
+      model: openrouter/qwen/qwen3-next-80b-a3b-instruct:free
+      api_key: "YOUR_OPENROUTER_API_KEY"
+      stream: true
+      timeout: 30
+
+  - model_name: normal-2
+    litellm_params:
+      model: openrouter/google/gemma-4-31b-it:free
+      api_key: "YOUR_OPENROUTER_API_KEY"
+      stream: true
+      timeout: 30
+
+  - model_name: normal-3
+    litellm_params:
+      model: openrouter/google/gemma-4-26b-a4b-it:free
+      api_key: "YOUR_OPENROUTER_API_KEY"
+      stream: true
+      timeout: 30
+
+  - model_name: normal-4
+    litellm_params:
+      model: ollama/gemma4:31b-cloud
+      api_base: http://host.docker.internal:11434
+      stream: true
+      timeout: 30
+
+  - model_name: normal-5
+    litellm_params:
+      model: ollama/gemma4:31b
+      api_base: http://host.docker.internal:11434
+      stream: true
+      timeout: 600
+
+  - model_name: normal-6
+    litellm_params:
+      model: ollama/gemma4:26b
+      api_base: http://host.docker.internal:11434
+      stream: true
+      timeout: 600
+
+  - model_name: normal-7
+    litellm_params:
+      model: ollama/gemma4:e2b
+      api_base: http://host.docker.internal:11434
+      stream: true
+      timeout: 600
+
+  # ============================================================
+  # FAST TIER - Speed first
+  # Priority: OpenRouter free (instant) → small local models
+  # ============================================================
+  - model_name: fast
+    litellm_params:
+      model: openrouter/google/gemma-4-26b-a4b-it:free
+      api_key: "YOUR_OPENROUTER_API_KEY"
+      stream: true
+      timeout: 20
+
+  - model_name: fast-2
+    litellm_params:
+      model: openrouter/openai/gpt-oss-20b:free
+      api_key: "YOUR_OPENROUTER_API_KEY"
+      stream: true
+      timeout: 20
+
+  - model_name: fast-3
+    litellm_params:
+      model: ollama/gemma4:e2b
+      api_base: http://host.docker.internal:11434
+      stream: true
+      timeout: 600
+
+  - model_name: fast-4
+    litellm_params:
+      model: ollama/hermes3
+      api_base: http://host.docker.internal:11434
+      stream: true
+      timeout: 600
+
+  - model_name: fast-5
+    litellm_params:
+      model: ollama/llama3.2
+      api_base: http://host.docker.internal:11434
+      stream: true
+      timeout: 600
+
+router_settings:
+  routing_strategy: "simple-shuffle"
+  num_retries: 0
+  timeout: 30
+  retry_after: 0
+  allowed_fails: 0

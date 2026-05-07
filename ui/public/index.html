@@ -377,7 +377,8 @@
       flex-shrink: 0;
     }
     .model-health.healthy   { background: var(--success); box-shadow: 0 0 5px var(--success); }
-    .model-health.unhealthy { background: var(--danger); }
+    .model-health.unhealthy { background: var(--danger); box-shadow: 0 0 5px var(--danger); }
+    .model-health.slow      { background: var(--warning); box-shadow: 0 0 5px var(--warning); }
 
     .model-actions { display: flex; gap: 0.25rem; flex-shrink: 0; }
 
@@ -1308,7 +1309,6 @@ const App = {
       if (data.ok) {
         badge.className = 'status-badge online';
         text.textContent = 'Gateway online';
-        this._applyModelHealth(data.body);
       } else {
         badge.className = 'status-badge offline';
         text.textContent = 'Gateway offline';
@@ -1317,39 +1317,27 @@ const App = {
       badge.className = 'status-badge offline';
       text.textContent = 'Unreachable';
     }
+
+    try {
+      const mres = await fetch('/api/health/models');
+      const mdata = await mres.json();
+      if (mdata.ok) this._applyModelHealth(mdata.models);
+    } catch {}
   },
 
-  /**
-   * Apply health status to individual model rows.
-   * LiteLLM's /health response has a "healthy_endpoints" and
-   * "unhealthy_endpoints" structure — we do best-effort matching.
-   */
-  _applyModelHealth(body) {
-    if (!body) return;
-    const healthy = new Set();
-    const unhealthy = new Set();
-
-    const mark = (list, set) => {
-      if (!Array.isArray(list)) return;
-      for (const ep of list) {
-        // ep.model_name or ep.litellm_params?.model
-        const name = ep.model_name || (ep.litellm_params && ep.litellm_params.model);
-        if (name) set.add(name);
-      }
-    };
-
-    mark(body.healthy_endpoints, healthy);
-    mark(body.unhealthy_endpoints, unhealthy);
-
-    // Update model health flags in our state and re-render affected dots
+  _applyModelHealth(models) {
+    if (!Array.isArray(models)) return;
+    const statusMap = {};
+    for (const m of models) {
+      statusMap[m.model_name] = m.status;
+    }
     for (const tier of ConfigParser.TIERS) {
       for (const m of this.chains[tier]) {
-        const id = m.litellm_params.model;
-        if (healthy.has(id) || healthy.has(m.model_name)) {
-          m._health = 'healthy';
-        } else if (unhealthy.has(id) || unhealthy.has(m.model_name)) {
-          m._health = 'unhealthy';
-        }
+        const st = statusMap[m.model_name];
+        if (st === 'healthy') m._health = 'healthy';
+        else if (st === 'unhealthy') m._health = 'unhealthy';
+        else if (st === 'slow') m._health = 'slow';
+        else m._health = '';
       }
     }
     this.renderTiers();

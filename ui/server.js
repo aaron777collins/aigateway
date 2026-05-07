@@ -204,13 +204,44 @@ app.get('/api/health', async (req, res) => {
 // ---------------------------------------------------------------------------
 app.get('/api/health/models', async (req, res) => {
   try {
-    const headers = LITELLM_KEY ? { Authorization: `Bearer ${LITELLM_KEY}` } : {};
-    const response = await fetch(`${LITELLM_URL}/health`, {
-      timeout: 15_000,
-      headers,
+    const cfg = readConfig();
+    const models = (cfg.model_list || []).map(m => {
+      const model = m.litellm_params?.model || '';
+      const isLocal = model.startsWith('ollama/') && !model.includes(':cloud');
+      const isOpenRouter = model.startsWith('openrouter/');
+      return {
+        model_name: m.model_name,
+        model: model,
+        status: isLocal ? 'slow' : 'unknown',
+        provider: isLocal ? 'ollama-local' : isOpenRouter ? 'openrouter' : model.startsWith('ollama/') ? 'ollama-cloud' : 'other',
+      };
     });
-    const body = await response.json().catch(() => ({}));
-    res.status(response.status).json({ ok: response.ok, status: response.status, body });
+
+    // Quick-check a few cloud/API models with a fast timeout
+    const checkPromises = models
+      .filter(m => m.provider !== 'ollama-local')
+      .map(async (m) => {
+        try {
+          const params = (cfg.model_list || []).find(x => x.model_name === m.model_name)?.litellm_params;
+          if (!params) return;
+          let url, headers = {};
+          if (m.provider === 'ollama-cloud') {
+            url = (params.api_base || 'http://host.docker.internal:11434') + '/api/tags';
+          } else if (m.provider === 'openrouter') {
+            url = 'https://openrouter.ai/api/v1/models';
+            if (params.api_key) headers.Authorization = `Bearer ${params.api_key}`;
+          } else {
+            return;
+          }
+          const r = await fetch(url, { timeout: 5_000, headers });
+          m.status = r.ok ? 'healthy' : 'unhealthy';
+        } catch {
+          m.status = 'unhealthy';
+        }
+      });
+    await Promise.all(checkPromises);
+
+    res.json({ ok: true, models });
   } catch (err) {
     console.error('[GET /api/health/models]', err.message);
     res.status(503).json({ ok: false, error: err.message });

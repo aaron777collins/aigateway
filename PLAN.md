@@ -1,8 +1,47 @@
 # AI Gateway - 3-Tier LiteLLM Proxy
 
 ## Overview
-Three OpenAI-compatible endpoints via LiteLLM proxy, each with ordered fallback chains.
-All endpoints are localhost/docker-network only — NOT exposed to the public web.
+Three OpenAI-compatible endpoints via LiteLLM proxy, each with ordered fallback (waterfall) chains.
+The LiteLLM API is localhost/docker-network only. The config UI is behind Authelia SSO.
+
+## Quick Start
+
+### Hit the gateway
+
+```bash
+# Base URL
+export GATEWAY_URL="http://localhost:4000/v1"
+export GATEWAY_KEY="sk-litellm-gateway-a8f3c9d2e1b0"
+
+# Smart tier (best reasoning/coding models)
+curl $GATEWAY_URL/chat/completions \
+  -H "Authorization: Bearer $GATEWAY_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "smart", "messages": [{"role": "user", "content": "Hello!"}]}'
+
+# Normal tier (balanced)
+curl $GATEWAY_URL/chat/completions \
+  -H "Authorization: Bearer $GATEWAY_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "normal", "messages": [{"role": "user", "content": "Hello!"}]}'
+
+# Fast tier (speed-first)
+curl $GATEWAY_URL/chat/completions \
+  -H "Authorization: Bearer $GATEWAY_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "fast", "messages": [{"role": "user", "content": "Hello!"}]}'
+```
+
+### Use with any OpenAI-compatible client
+
+- **Base URL:** `http://localhost:4000/v1`
+- **API Key:** `sk-litellm-gateway-a8f3c9d2e1b0`
+- **Model:** `smart`, `normal`, or `fast`
+
+### Config UI
+
+- **Local:** http://localhost:4002
+- **Public (SSO):** https://aigateway.aaroncollins.info (requires Authelia login)
 
 ## Available Resources
 
@@ -10,82 +49,105 @@ All endpoints are localhost/docker-network only — NOT exposed to the public we
 | Model | Alias | Tier |
 |-------|-------|------|
 | glm-5.1:cloud | Opus | Smart |
-| gemma4:31b-cloud | OpusFallbackCloud | Smart/Normal |
+| gemma4:31b-cloud | OpusFallbackCloud | Smart |
 
-### Ollama Local (localhost:11434)
+### Ollama Local (localhost:11434, CPU — ~10 min response)
 | Model | Size | Tier |
 |-------|------|------|
 | gemma4:31b | 31.3B Q4_K_M | Smart/Normal |
-| gemma4:26b | 25.8B Q4_K_M | Normal |
-| gemma4:e2b | 5.1B Q4_K_M | Fast |
+| gemma4:26b | 25.8B Q4_K_M | Smart/Normal |
+| gemma4:e2b | 5.1B Q4_K_M | Normal/Fast |
 | hermes3 | 8B Q4_0 | Fast |
 | llama3.2 | 3.2B Q4_K_M | Fast |
 
-### OpenRouter Free (via proxy at localhost:4001)
+### OpenRouter Free (direct API, $0 cost)
 | Model | Size/Type | Tier |
 |-------|-----------|------|
 | qwen/qwen3-coder:free | 480B MoE (35B active) | Smart |
 | openai/gpt-oss-120b:free | 117B MoE (5.1B active) | Smart |
 | qwen/qwen3-next-80b-a3b-instruct:free | 80B MoE (3B active) | Normal |
-| google/gemma-4-31b-it:free | 31B dense | Normal |
+| google/gemma-4-31b-it:free | 31B dense | Smart/Normal |
 | google/gemma-4-26b-a4b-it:free | 25B MoE (4B active) | Normal/Fast |
 | openai/gpt-oss-20b:free | 21B MoE (3.6B active) | Fast |
 
-## Fallback Chains
+## Waterfall Chains
+
+Each tier tries models in order. If a model fails (timeout, rate limit, error), it instantly falls to the next one. Cloud/API models timeout at 30s, local models at 600s (CPU).
 
 ### Smart Tier (`model: smart`)
-Priority order (try each, fall through on any failure):
-1. `ollama/glm-5.1:cloud` — Best model, cloud-hosted GLM
-2. `openrouter/qwen/qwen3-coder:free` — 480B MoE coding beast
-3. `openrouter/openai/gpt-oss-120b:free` — 120B reasoning
-4. `ollama/gemma4:31b-cloud` — Cloud Gemma fallback
-5. `ollama/gemma4:31b` — Local 31B fallback
-6. `ollama/gemma4:26b` — Local 26B last resort
+| # | Model | Provider | Timeout |
+|---|-------|----------|---------|
+| 1 | glm-5.1:cloud | Ollama Cloud | 30s |
+| 2 | qwen/qwen3-coder:free | OpenRouter | 30s |
+| 3 | openai/gpt-oss-120b:free | OpenRouter | 30s |
+| 4 | gemma4:31b-cloud | Ollama Cloud | 30s |
+| 5 | google/gemma-4-31b-it:free | OpenRouter | 30s |
+| 6 | gemma4:31b | Ollama Local | 600s |
+| 7 | gemma4:26b | Ollama Local | 600s |
 
 ### Normal Tier (`model: normal`)
-Priority order:
-1. `ollama/gemma4:31b-cloud` — Cloud 31B
-2. `openrouter/qwen/qwen3-next-80b-a3b-instruct:free` — 80B MoE
-3. `openrouter/google/gemma-4-31b-it:free` — Free Gemma 31B
-4. `ollama/gemma4:31b` — Local 31B
-5. `ollama/gemma4:26b` — Local 26B
-6. `openrouter/google/gemma-4-26b-a4b-it:free` — Free 26B MoE
-7. `ollama/gemma4:e2b` — Local 5B fallback
+| # | Model | Provider | Timeout |
+|---|-------|----------|---------|
+| 1 | qwen/qwen3-next-80b-a3b-instruct:free | OpenRouter | 30s |
+| 2 | google/gemma-4-31b-it:free | OpenRouter | 30s |
+| 3 | google/gemma-4-26b-a4b-it:free | OpenRouter | 30s |
+| 4 | gemma4:31b-cloud | Ollama Cloud | 30s |
+| 5 | gemma4:31b | Ollama Local | 600s |
+| 6 | gemma4:26b | Ollama Local | 600s |
+| 7 | gemma4:e2b | Ollama Local | 600s |
 
 ### Fast Tier (`model: fast`)
-Priority order:
-1. `openrouter/google/gemma-4-26b-a4b-it:free` — Fast 4B active MoE
-2. `openrouter/openai/gpt-oss-20b:free` — Fast 3.6B active MoE
-3. `ollama/gemma4:e2b` — Local 5B
-4. `ollama/hermes3` — Local 8B
-5. `ollama/llama3.2` — Local 3B
+| # | Model | Provider | Timeout |
+|---|-------|----------|---------|
+| 1 | google/gemma-4-26b-a4b-it:free | OpenRouter | 20s |
+| 2 | openai/gpt-oss-20b:free | OpenRouter | 20s |
+| 3 | gemma4:e2b | Ollama Local | 600s |
+| 4 | hermes3 | Ollama Local | 600s |
+| 5 | llama3.2 | Ollama Local | 600s |
 
 ## Architecture
 
 ```
-Client → LiteLLM Proxy (localhost:4000) → Router
-                                           ├─ Ollama (localhost:11434)
-                                           └─ OpenRouter Proxy (localhost:4001)
+Client (curl, OpenClaw, any OpenAI client)
+    │
+    ▼
+LiteLLM Proxy (127.0.0.1:4000)
+    │  model: "smart" | "normal" | "fast"
+    │
+    ▼
+Router (waterfall fallback)
+    ├─ Ollama Cloud (localhost:11434 → ollama.com)
+    ├─ OpenRouter Free (openrouter.ai/api/v1)
+    └─ Ollama Local (localhost:11434, CPU)
+
+Config UI (127.0.0.1:4002 / aigateway.aaroncollins.info)
+    │  Reads/writes litellm_config.yaml
+    │  Can restart LiteLLM container
+    └─ Protected by Authelia SSO
 ```
 
-- LiteLLM runs as a Docker container
-- Bound to 127.0.0.1:4000 only
-- Connected to docker `internal` network for container-to-container access
-- Uses LiteLLM's built-in router with `fallbacks` for ordered model failover
-- OpenAI-compatible API at /v1/chat/completions
+## Services
 
-## Endpoints
+| Service | Port | Access |
+|---------|------|--------|
+| LiteLLM Proxy | 127.0.0.1:4000 | localhost only |
+| Config UI | 127.0.0.1:4002 | localhost + SSO at aigateway.aaroncollins.info |
 
-```bash
-# Smart
-curl http://localhost:4000/v1/chat/completions -H "Authorization: Bearer $KEY" \
-  -d '{"model": "smart", "messages": [{"role": "user", "content": "..."}]}'
+## Files
 
-# Normal
-curl http://localhost:4000/v1/chat/completions -H "Authorization: Bearer $KEY" \
-  -d '{"model": "normal", "messages": [{"role": "user", "content": "..."}]}'
+| File | Purpose |
+|------|---------|
+| `docker-compose.yml` | LiteLLM + UI containers |
+| `litellm_config.yaml` | Gateway config (has API keys, gitignored) |
+| `litellm_config.example.yaml` | Template config (safe to commit) |
+| `ui/server.js` | Config UI backend |
+| `ui/public/index.html` | Config UI frontend |
+| `ui/Dockerfile` | UI container build |
 
-# Fast
-curl http://localhost:4000/v1/chat/completions -H "Authorization: Bearer $KEY" \
-  -d '{"model": "fast", "messages": [{"role": "user", "content": "..."}]}'
-```
+## GitHub
+
+Repository: https://github.com/aaron777collins/aigateway
+
+## DNS Required
+
+Add an A record: `aigateway.aaroncollins.info` → `65.108.1.247`

@@ -26,6 +26,30 @@ services:
       retries: 3
       start_period: 15s
 
+  aigateway-ui:
+    build:
+      context: ./ui
+      dockerfile: Dockerfile
+    container_name: aigateway-ui
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:4002:4002"
+    volumes:
+      # Config file is writable so the UI can save changes
+      - ./litellm_config.yaml:/config/litellm_config.yaml
+      # Docker socket gives the UI permission to restart the litellm container
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      CONFIG_PATH: /config/litellm_config.yaml
+      LITELLM_URL: http://litellm:4000
+      LITELLM_CONTAINER: aigateway-litellm
+      LITELLM_KEY: "${LITELLM_MASTER_KEY}"
+      PORT: "4002"
+    depends_on:
+      - litellm
+    networks:
+      - internal
+
 networks:
   internal:
     external: true

@@ -29,6 +29,7 @@ const CONFIG_PATH = process.env.CONFIG_PATH || '/config/litellm_config.yaml';
 const LITELLM_URL = process.env.LITELLM_URL || 'http://litellm:4000';
 const LITELLM_CONTAINER = process.env.LITELLM_CONTAINER || 'aigateway-litellm';
 const PORT = parseInt(process.env.PORT || '4002', 10);
+const LITELLM_KEY = process.env.LITELLM_KEY || '';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -186,11 +187,13 @@ app.post('/api/config', async (req, res) => {
 // ---------------------------------------------------------------------------
 app.get('/api/health', async (req, res) => {
   try {
-    const response = await fetch(`${LITELLM_URL}/health`, {
-      timeout: 8_000,
+    const headers = LITELLM_KEY ? { Authorization: `Bearer ${LITELLM_KEY}` } : {};
+    const response = await fetch(`${LITELLM_URL}/health/liveliness`, {
+      timeout: 5_000,
+      headers,
     });
     const body = await response.json().catch(() => ({}));
-    res.status(response.status).json({ ok: response.ok, status: response.status, body });
+    res.json({ ok: response.ok, status: response.status, body });
   } catch (err) {
     console.error('[GET /api/health]', err.message);
     res.status(503).json({ ok: false, error: err.message });
@@ -203,8 +206,10 @@ app.get('/api/health', async (req, res) => {
 // ---------------------------------------------------------------------------
 app.get('/api/health/models', async (req, res) => {
   try {
+    const headers = LITELLM_KEY ? { Authorization: `Bearer ${LITELLM_KEY}` } : {};
     const response = await fetch(`${LITELLM_URL}/health`, {
       timeout: 15_000,
+      headers,
     });
     const body = await response.json().catch(() => ({}));
     res.status(response.status).json({ ok: response.ok, status: response.status, body });

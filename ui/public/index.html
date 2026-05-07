@@ -1,0 +1,1592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Gateway — Config Manager</title>
+  <style>
+    /* -----------------------------------------------------------------------
+       Design tokens
+    ----------------------------------------------------------------------- */
+    :root {
+      --bg:           #0a0d1a;
+      --bg-surface:   #0f1428;
+      --bg-card:      #131829;
+      --bg-input:     #1a1f35;
+      --border:       rgba(255,255,255,0.07);
+      --border-hover: rgba(255,255,255,0.15);
+
+      --text:         #e2e8f0;
+      --text-muted:   #64748b;
+      --text-dim:     #94a3b8;
+
+      /* Tier accent colours */
+      --smart-glow:   #22c55e;
+      --smart-dim:    rgba(34,197,94,0.12);
+      --normal-glow:  #3b82f6;
+      --normal-dim:   rgba(59,130,246,0.12);
+      --fast-glow:    #f97316;
+      --fast-dim:     rgba(249,115,22,0.12);
+
+      --accent:       #6366f1;
+      --accent-dim:   rgba(99,102,241,0.15);
+
+      --danger:       #ef4444;
+      --success:      #22c55e;
+      --warning:      #f59e0b;
+
+      --radius:       12px;
+      --radius-sm:    8px;
+      --transition:   0.2s ease;
+    }
+
+    /* -----------------------------------------------------------------------
+       Reset & base
+    ----------------------------------------------------------------------- */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { font-size: 15px; }
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      background-image:
+        radial-gradient(ellipse 80% 40% at 20% -10%, rgba(99,102,241,0.08) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 30% at 80% 110%, rgba(59,130,246,0.06) 0%, transparent 60%);
+    }
+
+    a { color: inherit; text-decoration: none; }
+    button { font-family: inherit; cursor: pointer; border: none; }
+    input, select, textarea { font-family: inherit; }
+
+    /* -----------------------------------------------------------------------
+       Layout
+    ----------------------------------------------------------------------- */
+    .layout {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    /* -----------------------------------------------------------------------
+       Header
+    ----------------------------------------------------------------------- */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 2rem;
+      background: rgba(15,20,40,0.8);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .header-logo {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+    }
+
+    .header-title { font-size: 1.05rem; font-weight: 600; }
+    .header-sub   { font-size: 0.75rem; color: var(--text-muted); margin-top: 1px; }
+
+    .header-actions { display: flex; gap: 0.5rem; align-items: center; }
+
+    /* -----------------------------------------------------------------------
+       Status badge
+    ----------------------------------------------------------------------- */
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.35rem 0.75rem;
+      border-radius: 99px;
+      font-size: 0.78rem;
+      font-weight: 500;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      transition: var(--transition);
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--text-muted);
+      flex-shrink: 0;
+    }
+
+    .status-badge.online  .status-dot { background: var(--success); box-shadow: 0 0 6px var(--success); }
+    .status-badge.offline .status-dot { background: var(--danger); }
+    .status-badge.checking .status-dot { background: var(--warning); animation: pulse 1s infinite; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.3; }
+    }
+
+    /* -----------------------------------------------------------------------
+       Buttons
+    ----------------------------------------------------------------------- */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.5rem 1rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.85rem;
+      font-weight: 500;
+      transition: var(--transition);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      color: #fff;
+      box-shadow: 0 0 20px rgba(99,102,241,0.3);
+    }
+    .btn-primary:hover { filter: brightness(1.1); box-shadow: 0 0 28px rgba(99,102,241,0.45); }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-dim);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover { background: var(--bg-input); color: var(--text); border-color: var(--border-hover); }
+
+    .btn-danger {
+      background: rgba(239,68,68,0.12);
+      color: var(--danger);
+      border: 1px solid rgba(239,68,68,0.25);
+    }
+    .btn-danger:hover { background: rgba(239,68,68,0.2); }
+
+    .btn-success {
+      background: rgba(34,197,94,0.12);
+      color: var(--success);
+      border: 1px solid rgba(34,197,94,0.25);
+    }
+    .btn-success:hover { background: rgba(34,197,94,0.2); }
+
+    .btn-sm { padding: 0.3rem 0.65rem; font-size: 0.78rem; }
+
+    .btn:disabled { opacity: 0.45; pointer-events: none; }
+
+    /* -----------------------------------------------------------------------
+       Main content
+    ----------------------------------------------------------------------- */
+    .main {
+      padding: 2rem;
+      max-width: 1280px;
+      margin: 0 auto;
+      width: 100%;
+      flex: 1;
+    }
+
+    /* -----------------------------------------------------------------------
+       Section headers
+    ----------------------------------------------------------------------- */
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.25rem;
+    }
+
+    .section-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    /* -----------------------------------------------------------------------
+       Tier grid
+    ----------------------------------------------------------------------- */
+    .tiers-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+    }
+
+    @media (max-width: 900px) {
+      .tiers-grid { grid-template-columns: 1fr; }
+    }
+
+    /* -----------------------------------------------------------------------
+       Tier card
+    ----------------------------------------------------------------------- */
+    .tier-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: box-shadow var(--transition);
+    }
+
+    .tier-card[data-tier="smart"] {
+      border-top: 2px solid var(--smart-glow);
+      box-shadow: 0 0 30px var(--smart-dim);
+    }
+    .tier-card[data-tier="normal"] {
+      border-top: 2px solid var(--normal-glow);
+      box-shadow: 0 0 30px var(--normal-dim);
+    }
+    .tier-card[data-tier="fast"] {
+      border-top: 2px solid var(--fast-glow);
+      box-shadow: 0 0 30px var(--fast-dim);
+    }
+
+    .tier-header {
+      padding: 1rem 1.25rem 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tier-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      flex-shrink: 0;
+    }
+
+    [data-tier="smart"]  .tier-icon { background: var(--smart-dim);  }
+    [data-tier="normal"] .tier-icon { background: var(--normal-dim); }
+    [data-tier="fast"]   .tier-icon { background: var(--fast-dim);   }
+
+    .tier-label {
+      font-size: 0.95rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    [data-tier="smart"]  .tier-label { color: var(--smart-glow);  }
+    [data-tier="normal"] .tier-label { color: var(--normal-glow); }
+    [data-tier="fast"]   .tier-label { color: var(--fast-glow);   }
+
+    .tier-count {
+      margin-left: auto;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      background: var(--bg-input);
+      border-radius: 99px;
+      padding: 0.15rem 0.55rem;
+    }
+
+    /* -----------------------------------------------------------------------
+       Model chain list
+    ----------------------------------------------------------------------- */
+    .model-chain {
+      padding: 0.75rem;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+      min-height: 60px;
+    }
+
+    .model-chain.drag-over { background: rgba(99,102,241,0.05); }
+
+    .model-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.55rem 0.65rem;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      transition: var(--transition);
+      user-select: none;
+    }
+
+    .model-row:hover { border-color: var(--border-hover); background: #1e2440; }
+    .model-row.dragging { opacity: 0.4; }
+    .model-row.drag-placeholder { border: 1px dashed var(--accent); background: var(--accent-dim); }
+
+    .drag-handle {
+      color: var(--text-muted);
+      cursor: grab;
+      font-size: 0.85rem;
+      flex-shrink: 0;
+      line-height: 1;
+    }
+    .drag-handle:active { cursor: grabbing; }
+
+    .model-position {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.65rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+
+    .model-info { flex: 1; min-width: 0; }
+
+    .model-identifier {
+      font-size: 0.8rem;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .model-provider {
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      margin-top: 1px;
+    }
+
+    .model-health {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--text-muted);
+      flex-shrink: 0;
+    }
+    .model-health.healthy   { background: var(--success); box-shadow: 0 0 5px var(--success); }
+    .model-health.unhealthy { background: var(--danger); }
+
+    .model-actions { display: flex; gap: 0.25rem; flex-shrink: 0; }
+
+    .icon-btn {
+      width: 26px;
+      height: 26px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-muted);
+      transition: var(--transition);
+    }
+    .icon-btn:hover { background: var(--bg); border-color: var(--border); color: var(--text); }
+    .icon-btn.danger:hover { color: var(--danger); border-color: rgba(239,68,68,0.3); background: rgba(239,68,68,0.08); }
+
+    .tier-footer {
+      padding: 0.65rem;
+      border-top: 1px solid var(--border);
+    }
+
+    .add-model-btn {
+      width: 100%;
+      padding: 0.5rem;
+      border-radius: var(--radius-sm);
+      background: transparent;
+      border: 1px dashed var(--border);
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      transition: var(--transition);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.35rem;
+    }
+    .add-model-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+
+    /* -----------------------------------------------------------------------
+       Providers section
+    ----------------------------------------------------------------------- */
+    .providers-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .provider-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      transition: var(--transition);
+    }
+    .provider-card:hover { border-color: var(--border-hover); }
+
+    .provider-header {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin-bottom: 0.85rem;
+    }
+
+    .provider-icon {
+      width: 30px;
+      height: 30px;
+      border-radius: 7px;
+      background: var(--bg-input);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.9rem;
+      flex-shrink: 0;
+    }
+
+    .provider-name { font-size: 0.88rem; font-weight: 600; }
+    .provider-type { font-size: 0.7rem; color: var(--text-muted); }
+
+    .provider-actions { margin-left: auto; }
+
+    /* -----------------------------------------------------------------------
+       Form elements
+    ----------------------------------------------------------------------- */
+    .form-group { margin-bottom: 0.85rem; }
+    .form-group:last-child { margin-bottom: 0; }
+
+    .form-label {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--text-dim);
+      margin-bottom: 0.35rem;
+    }
+
+    .form-input {
+      width: 100%;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 0.5rem 0.75rem;
+      color: var(--text);
+      font-size: 0.82rem;
+      transition: var(--transition);
+      outline: none;
+    }
+    .form-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+    .form-input::placeholder { color: var(--text-muted); }
+
+    select.form-input { appearance: none; cursor: pointer; }
+
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem; }
+
+    /* -----------------------------------------------------------------------
+       Modal / overlay
+    ----------------------------------------------------------------------- */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.65);
+      backdrop-filter: blur(4px);
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
+    .overlay.open { opacity: 1; pointer-events: auto; }
+
+    .modal {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      width: 100%;
+      max-width: 460px;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.5);
+      transform: translateY(12px);
+      transition: transform 0.2s;
+    }
+    .overlay.open .modal { transform: translateY(0); }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.25rem;
+    }
+    .modal-title { font-size: 1rem; font-weight: 600; }
+
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.5rem;
+      margin-top: 1.25rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+    }
+
+    /* -----------------------------------------------------------------------
+       Toast notifications
+    ----------------------------------------------------------------------- */
+    .toast-stack {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      pointer-events: none;
+    }
+
+    .toast {
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.82rem;
+      font-weight: 500;
+      max-width: 320px;
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      animation: slide-in 0.25s ease;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+    }
+    @keyframes slide-in {
+      from { transform: translateX(100%); opacity: 0; }
+      to   { transform: translateX(0);   opacity: 1; }
+    }
+    .toast-success { background: #14532d; border: 1px solid var(--success); color: #bbf7d0; }
+    .toast-error   { background: #450a0a; border: 1px solid var(--danger);  color: #fecaca; }
+    .toast-info    { background: #1e1b4b; border: 1px solid var(--accent);  color: #c7d2fe; }
+
+    /* -----------------------------------------------------------------------
+       Save bar
+    ----------------------------------------------------------------------- */
+    .save-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(10,13,26,0.92);
+      backdrop-filter: blur(12px);
+      border-top: 1px solid var(--border);
+      padding: 0.85rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      z-index: 90;
+      transform: translateY(100%);
+      transition: transform 0.3s ease;
+    }
+    .save-bar.visible { transform: translateY(0); }
+
+    .save-bar-msg { font-size: 0.82rem; color: var(--text-dim); }
+    .save-bar-actions { display: flex; gap: 0.5rem; }
+
+    /* -----------------------------------------------------------------------
+       Loading spinner
+    ----------------------------------------------------------------------- */
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,0.15);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* -----------------------------------------------------------------------
+       Empty state
+    ----------------------------------------------------------------------- */
+    .empty-state {
+      text-align: center;
+      padding: 1.5rem 1rem;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+    }
+
+    /* -----------------------------------------------------------------------
+       Provider type tag
+    ----------------------------------------------------------------------- */
+    .tag {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 99px;
+      font-size: 0.68rem;
+      font-weight: 500;
+    }
+    .tag-ollama     { background: rgba(245,158,11,0.12); color: #fbbf24; border: 1px solid rgba(245,158,11,0.25); }
+    .tag-openrouter { background: rgba(99,102,241,0.12); color: #a5b4fc; border: 1px solid rgba(99,102,241,0.25); }
+    .tag-groq       { background: rgba(34,197,94,0.12);  color: #86efac; border: 1px solid rgba(34,197,94,0.25);  }
+    .tag-custom     { background: rgba(100,116,139,0.12); color: #94a3b8; border: 1px solid rgba(100,116,139,0.25); }
+
+    /* -----------------------------------------------------------------------
+       YAML preview
+    ----------------------------------------------------------------------- */
+    .yaml-preview {
+      background: #0a0d1a;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 1rem;
+      font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+      font-size: 0.72rem;
+      color: #94a3b8;
+      overflow: auto;
+      max-height: 260px;
+      line-height: 1.6;
+      white-space: pre;
+    }
+
+    /* -----------------------------------------------------------------------
+       Scrollbar (webkit)
+    ----------------------------------------------------------------------- */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--border-hover); }
+  </style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- ======================================================================
+       Header
+  ====================================================================== -->
+  <header class="header">
+    <div class="header-brand">
+      <div class="header-logo">&#127760;</div>
+      <div>
+        <div class="header-title">AI Gateway</div>
+        <div class="header-sub">LiteLLM Config Manager</div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <div class="status-badge checking" id="gateway-status">
+        <div class="status-dot"></div>
+        <span id="gateway-status-text">Checking…</span>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="App.refreshHealth()" title="Refresh health">&#8635;</button>
+    </div>
+  </header>
+
+  <!-- ======================================================================
+       Main
+  ====================================================================== -->
+  <main class="main">
+
+    <!-- Tier chain section -->
+    <div class="section-header">
+      <span class="section-title">&#9654; Tier Chains</span>
+      <button class="btn btn-ghost btn-sm" onclick="App.showYamlPreview()">&#128196; Preview YAML</button>
+    </div>
+
+    <div class="tiers-grid" id="tiers-grid"></div>
+
+    <!-- Providers section -->
+    <div class="section-header" style="margin-top:0.5rem">
+      <span class="section-title">&#128268; Providers</span>
+      <button class="btn btn-ghost btn-sm" onclick="App.showAddProviderModal()">+ Add Provider</button>
+    </div>
+
+    <div class="providers-grid" id="providers-grid"></div>
+
+  </main>
+
+  <!-- ======================================================================
+       Save bar
+  ====================================================================== -->
+  <div class="save-bar" id="save-bar">
+    <span class="save-bar-msg">&#9679; You have unsaved changes</span>
+    <div class="save-bar-actions">
+      <button class="btn btn-ghost btn-sm" onclick="App.discardChanges()">Discard</button>
+      <button class="btn btn-primary btn-sm" id="save-btn" onclick="App.saveConfig(false)">Save</button>
+      <button class="btn btn-success btn-sm" id="save-restart-btn" onclick="App.saveConfig(true)">Save &amp; Restart Gateway</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- ========================================================================
+     Modals
+======================================================================== -->
+
+<!-- Add / edit model modal -->
+<div class="overlay" id="model-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="model-modal-title">Add Model</span>
+      <button class="icon-btn" onclick="App.closeModal('model-modal')">&#10005;</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Provider</label>
+      <select class="form-input" id="mm-provider" onchange="App.onProviderChange()">
+        <option value="ollama">Ollama (local)</option>
+        <option value="openrouter">OpenRouter</option>
+        <option value="groq">Groq</option>
+        <option value="custom">Custom / OpenAI-compatible</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Model identifier</label>
+      <input class="form-input" id="mm-model" type="text" placeholder="e.g. ollama/gemma4:31b" />
+    </div>
+    <div class="form-group" id="mm-apibase-group">
+      <label class="form-label">API Base URL</label>
+      <input class="form-input" id="mm-apibase" type="text" placeholder="http://host.docker.internal:11434" />
+    </div>
+    <div class="form-group" id="mm-apikey-group" style="display:none">
+      <label class="form-label">API Key</label>
+      <input class="form-input" id="mm-apikey" type="password" placeholder="sk-..." />
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Timeout (seconds)</label>
+        <input class="form-input" id="mm-timeout" type="number" value="30" min="1" max="3600" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Stream</label>
+        <select class="form-input" id="mm-stream">
+          <option value="true">Enabled</option>
+          <option value="false">Disabled</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="App.closeModal('model-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="App.submitModelModal()">Add Model</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add provider modal -->
+<div class="overlay" id="provider-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Add Provider</span>
+      <button class="icon-btn" onclick="App.closeModal('provider-modal')">&#10005;</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Provider type</label>
+      <select class="form-input" id="pm-type" onchange="App.onProviderTypeChange()">
+        <option value="ollama">Ollama</option>
+        <option value="openrouter">OpenRouter</option>
+        <option value="groq">Groq</option>
+        <option value="custom">Custom / OpenAI-compatible</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Name / Label</label>
+      <input class="form-input" id="pm-name" type="text" placeholder="My Provider" />
+    </div>
+    <div class="form-group" id="pm-apibase-group">
+      <label class="form-label">API Base URL</label>
+      <input class="form-input" id="pm-apibase" type="text" placeholder="http://host.docker.internal:11434" />
+    </div>
+    <div class="form-group" id="pm-apikey-group" style="display:none">
+      <label class="form-label">API Key</label>
+      <input class="form-input" id="pm-apikey" type="password" placeholder="sk-..." />
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="App.closeModal('provider-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="App.submitProviderModal()">Add Provider</button>
+    </div>
+  </div>
+</div>
+
+<!-- YAML preview modal -->
+<div class="overlay" id="yaml-modal">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header">
+      <span class="modal-title">&#128196; Config Preview (YAML)</span>
+      <button class="icon-btn" onclick="App.closeModal('yaml-modal')">&#10005;</button>
+    </div>
+    <pre class="yaml-preview" id="yaml-preview-content"></pre>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="App.closeModal('yaml-modal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div class="toast-stack" id="toast-stack"></div>
+
+<!-- ========================================================================
+     Application JavaScript
+======================================================================== -->
+<script>
+'use strict';
+
+/* --------------------------------------------------------------------------
+   Tiny YAML serialiser
+   We only need to serialise the litellm_config structure (no complex types)
+   so we hand-roll a minimal serialiser rather than shipping a full YAML lib.
+   This avoids any external dependency in the browser.
+-------------------------------------------------------------------------- */
+const Yaml = {
+  /**
+   * Serialise a JavaScript value to a YAML string.
+   * indent: current indentation level (spaces)
+   */
+  dump(value, indent = 0) {
+    const pad = (n) => ' '.repeat(n);
+    if (value === null || value === undefined) return 'null';
+    if (typeof value === 'boolean') return String(value);
+    if (typeof value === 'number') return String(value);
+    if (typeof value === 'string') {
+      // Quote strings that could be misinterpreted or contain special chars
+      if (
+        value === '' ||
+        /[:{}\[\],&*#?|\-<>=!%@`]/.test(value[0]) ||
+        /[\n\r]/.test(value) ||
+        /^(true|false|null|yes|no)$/i.test(value) ||
+        /^\d/.test(value) && !/^\d+(\.\d+)?$/.test(value)
+      ) {
+        return '"' + value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n') + '"';
+      }
+      return value;
+    }
+    if (Array.isArray(value)) {
+      if (value.length === 0) return '[]';
+      // Scalar arrays on one line
+      if (value.every(v => typeof v !== 'object' || v === null)) {
+        return '[' + value.map(v => Yaml.dump(v)).join(', ') + ']';
+      }
+      return value.map(v => {
+        const dumped = Yaml.dump(v, indent + 2);
+        // Object: first key on same line as dash
+        if (typeof v === 'object' && v !== null && !Array.isArray(v)) {
+          const keys = Object.keys(v);
+          const firstKey = keys[0];
+          const rest = keys.slice(1);
+          let out = `\n${pad(indent)}- ${firstKey}: ${Yaml.dump(v[firstKey], indent + 2)}`;
+          for (const k of rest) {
+            out += `\n${pad(indent + 2)}${k}: ${Yaml.dump(v[k], indent + 2)}`;
+          }
+          return out;
+        }
+        return `\n${pad(indent)}- ${dumped}`;
+      }).join('');
+    }
+    if (typeof value === 'object') {
+      const keys = Object.keys(value);
+      if (keys.length === 0) return '{}';
+      return keys.map(k => {
+        const v = value[k];
+        if (typeof v === 'object' && v !== null && !Array.isArray(v) && Object.keys(v).length > 0) {
+          return `\n${pad(indent)}${k}:${Yaml.dump(v, indent + 2)}`;
+        }
+        if (Array.isArray(v) && v.some(el => typeof el === 'object' && el !== null)) {
+          return `\n${pad(indent)}${k}:${Yaml.dump(v, indent + 2)}`;
+        }
+        return `\n${pad(indent)}${k}: ${Yaml.dump(v, indent + 2)}`;
+      }).join('');
+    }
+    return String(value);
+  },
+
+  /** Top-level serialiser: produces a valid YAML document string */
+  stringify(obj) {
+    const lines = [];
+    for (const [key, val] of Object.entries(obj)) {
+      if (typeof val === 'object' && val !== null && !Array.isArray(val) && Object.keys(val).length > 0) {
+        lines.push(`${key}:${Yaml.dump(val, 2)}`);
+      } else if (Array.isArray(val)) {
+        lines.push(`${key}:${Yaml.dump(val, 2)}`);
+      } else {
+        lines.push(`${key}: ${Yaml.dump(val)}`);
+      }
+    }
+    return lines.join('\n') + '\n';
+  },
+};
+
+/* --------------------------------------------------------------------------
+   Config helpers
+   Parse the raw config object (from GET /api/config) into the UI's internal
+   model, and convert back before saving.
+-------------------------------------------------------------------------- */
+const ConfigParser = {
+  TIERS: ['smart', 'normal', 'fast'],
+  TIER_ICONS: { smart: '&#129504;', normal: '&#9889;', fast: '&#128640;' },
+
+  /**
+   * Extract the ordered list of models for a single tier from the flat
+   * model_list. The first entry has model_name === tier, subsequent entries
+   * are tier-2, tier-3, etc.
+   */
+  extractChain(modelList, tier) {
+    const chain = [];
+    // First slot
+    const first = modelList.find(m => m.model_name === tier);
+    if (first) chain.push(first);
+    // Numbered slots — iterate until a gap is found
+    let i = 2;
+    while (true) {
+      const entry = modelList.find(m => m.model_name === `${tier}-${i}`);
+      if (!entry) break;
+      chain.push(entry);
+      i++;
+    }
+    return chain;
+  },
+
+  /**
+   * Rebuild the model_list and fallbacks from the UI's three ordered chains.
+   * We preserve all non-tier models (if any exist in the original) unchanged.
+   */
+  buildConfig(original, chains) {
+    const newModelList = [];
+    const newFallbacks = [];
+
+    for (const tier of this.TIERS) {
+      const models = chains[tier];
+      models.forEach((m, idx) => {
+        const name = idx === 0 ? tier : `${tier}-${idx + 1}`;
+        newModelList.push({
+          model_name: name,
+          litellm_params: { ...m.litellm_params },
+        });
+        // Chain: tier-N → tier-(N+1)
+        if (idx < models.length - 1) {
+          const nextName = idx + 1 === 1 ? `${tier}-2` : `${tier}-${idx + 2}`;
+          newFallbacks.push({ [name]: [nextName] });
+        }
+      });
+    }
+
+    return {
+      ...original,
+      litellm_settings: {
+        ...original.litellm_settings,
+        fallbacks: newFallbacks,
+      },
+      model_list: newModelList,
+    };
+  },
+
+  /** Infer the provider type from a model identifier string */
+  providerOf(modelId) {
+    if (!modelId) return 'custom';
+    if (modelId.startsWith('ollama/')) return 'ollama';
+    if (modelId.startsWith('openrouter/')) return 'openrouter';
+    if (modelId.startsWith('groq/')) return 'groq';
+    return 'custom';
+  },
+
+  /** Strip the provider prefix to get a short display label */
+  shortModelId(modelId) {
+    return modelId.replace(/^(ollama|openrouter|groq)\//, '');
+  },
+};
+
+/* --------------------------------------------------------------------------
+   Toast
+-------------------------------------------------------------------------- */
+const Toast = {
+  show(message, type = 'info', duration = 3500) {
+    const stack = document.getElementById('toast-stack');
+    const el = document.createElement('div');
+    el.className = `toast toast-${type}`;
+    const icon = type === 'success' ? '&#10003;' : type === 'error' ? '&#10005;' : 'ℹ';
+    el.innerHTML = `<span>${icon}</span><span>${message}</span>`;
+    stack.appendChild(el);
+    setTimeout(() => {
+      el.style.opacity = '0';
+      el.style.transform = 'translateX(100%)';
+      el.style.transition = '0.3s';
+      setTimeout(() => el.remove(), 300);
+    }, duration);
+  },
+};
+
+/* --------------------------------------------------------------------------
+   Drag-and-drop state
+-------------------------------------------------------------------------- */
+const DnD = {
+  dragging: null,     // { tier, index, element }
+  placeholder: null,  // placeholder DOM node
+
+  start(event, tier, index) {
+    const row = event.currentTarget.closest('.model-row');
+    DnD.dragging = { tier, index, element: row };
+    row.classList.add('dragging');
+    // Ghost image: use the row itself but offset so cursor is at the handle
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setDragImage(row, 0, row.offsetHeight / 2);
+  },
+
+  over(event, tier, index) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    if (!DnD.dragging || DnD.dragging.tier !== tier) return;
+    if (DnD.dragging.index === index) return;
+    // Move the item in state and re-render
+    App.moveModel(tier, DnD.dragging.index, index);
+    DnD.dragging.index = index;
+  },
+
+  end() {
+    if (DnD.dragging) {
+      DnD.dragging.element.classList.remove('dragging');
+      DnD.dragging = null;
+    }
+  },
+};
+
+/* --------------------------------------------------------------------------
+   Main Application
+-------------------------------------------------------------------------- */
+const App = {
+  // Current config (raw, as received from the API)
+  rawConfig: null,
+  // Current in-memory chains: { smart: [...], normal: [...], fast: [...] }
+  chains: { smart: [], normal: [], fast: [] },
+  // Known providers (derived from config + user additions)
+  providers: [],
+  // Whether there are unsaved changes
+  dirty: false,
+  // Pending model-modal context
+  _modelModalCtx: null,
+
+  // -------------------------------------------------------------------------
+  // Initialisation
+  // -------------------------------------------------------------------------
+
+  async init() {
+    await this.loadConfig();
+    this.refreshHealth();
+    // Poll health every 30s
+    setInterval(() => this.refreshHealth(), 30_000);
+  },
+
+  async loadConfig() {
+    try {
+      const res = await fetch('/api/config');
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || 'Failed to load config');
+      this.rawConfig = data.config;
+      this.parseConfig();
+      this.render();
+      this.setDirty(false);
+    } catch (err) {
+      Toast.show('Failed to load config: ' + err.message, 'error', 6000);
+    }
+  },
+
+  parseConfig() {
+    for (const tier of ConfigParser.TIERS) {
+      this.chains[tier] = ConfigParser.extractChain(this.rawConfig.model_list || [], tier);
+    }
+    this.deriveProviders();
+  },
+
+  /** Build a de-duplicated provider list from what's in the current chains */
+  deriveProviders() {
+    const seen = new Set();
+    this.providers = [];
+    for (const tier of ConfigParser.TIERS) {
+      for (const m of this.chains[tier]) {
+        const p = m.litellm_params;
+        const type = ConfigParser.providerOf(p.model);
+        const key = type + ':' + (p.api_base || p.api_key || '');
+        if (!seen.has(key)) {
+          seen.add(key);
+          this.providers.push({
+            type,
+            name: this._providerName(type, p),
+            api_base: p.api_base || '',
+            api_key: p.api_key || '',
+          });
+        }
+      }
+    }
+  },
+
+  _providerName(type, params) {
+    if (type === 'ollama') return 'Ollama @ ' + (params.api_base || 'localhost:11434');
+    if (type === 'openrouter') return 'OpenRouter';
+    if (type === 'groq') return 'Groq';
+    return 'Custom (' + (params.api_base || 'OpenAI-compatible') + ')';
+  },
+
+  // -------------------------------------------------------------------------
+  // Rendering
+  // -------------------------------------------------------------------------
+
+  render() {
+    this.renderTiers();
+    this.renderProviders();
+  },
+
+  renderTiers() {
+    const grid = document.getElementById('tiers-grid');
+    grid.innerHTML = '';
+    for (const tier of ConfigParser.TIERS) {
+      grid.appendChild(this.buildTierCard(tier));
+    }
+  },
+
+  buildTierCard(tier) {
+    const models = this.chains[tier];
+    const card = document.createElement('div');
+    card.className = 'tier-card';
+    card.dataset.tier = tier;
+
+    const icons = { smart: '&#129504;', normal: '&#9889;', fast: '&#128640;' };
+    const labels = { smart: 'Smart', normal: 'Normal', fast: 'Fast' };
+
+    card.innerHTML = `
+      <div class="tier-header">
+        <div class="tier-icon">${icons[tier]}</div>
+        <div>
+          <div class="tier-label">${labels[tier]}</div>
+        </div>
+        <div class="tier-count">${models.length} model${models.length !== 1 ? 's' : ''}</div>
+      </div>
+      <div class="model-chain" id="chain-${tier}"
+           ondragover="event.preventDefault()"
+           ondrop="App.onChainDrop(event, '${tier}')">
+        ${models.length === 0 ? '<div class="empty-state">No models in chain</div>' : ''}
+        ${models.map((m, i) => this.buildModelRow(tier, m, i, models.length)).join('')}
+      </div>
+      <div class="tier-footer">
+        <button class="add-model-btn" onclick="App.showAddModelModal('${tier}')">
+          + Add model to ${tier} chain
+        </button>
+      </div>
+    `;
+    return card;
+  },
+
+  buildModelRow(tier, model, index, total) {
+    const p = model.litellm_params;
+    const provider = ConfigParser.providerOf(p.model);
+    const shortId = ConfigParser.shortModelId(p.model);
+    const tagClass = `tag-${provider}`;
+    const tagLabel = provider;
+    const healthClass = model._health || '';
+
+    return `
+      <div class="model-row"
+           draggable="true"
+           ondragstart="DnD.start(event, '${tier}', ${index})"
+           ondragover="DnD.over(event, '${tier}', ${index})"
+           ondragend="DnD.end()">
+        <span class="drag-handle" title="Drag to reorder">&#8801;</span>
+        <div class="model-position">${index + 1}</div>
+        <div class="model-info">
+          <div class="model-identifier" title="${p.model}">${shortId}</div>
+          <div class="model-provider">
+            <span class="tag ${tagClass}">${tagLabel}</span>
+            ${p.api_base ? ' &middot; ' + this._shortUrl(p.api_base) : ''}
+          </div>
+        </div>
+        <div class="model-health ${healthClass}" title="Health status"></div>
+        <div class="model-actions">
+          <button class="icon-btn" title="Move up"
+            onclick="App.moveModel('${tier}', ${index}, ${index - 1})"
+            ${index === 0 ? 'disabled style="opacity:.25"' : ''}>&#8679;</button>
+          <button class="icon-btn" title="Move down"
+            onclick="App.moveModel('${tier}', ${index}, ${index + 1})"
+            ${index === total - 1 ? 'disabled style="opacity:.25"' : ''}>&#8681;</button>
+          <button class="icon-btn danger" title="Remove"
+            onclick="App.removeModel('${tier}', ${index})">&#10005;</button>
+        </div>
+      </div>
+    `;
+  },
+
+  _shortUrl(url) {
+    try {
+      const u = new URL(url);
+      return u.host;
+    } catch { return url; }
+  },
+
+  renderProviders() {
+    const grid = document.getElementById('providers-grid');
+    grid.innerHTML = '';
+    const providerIcons = { ollama: '&#129430;', openrouter: '&#127760;', groq: '&#9889;', custom: '&#128268;' };
+    for (let i = 0; i < this.providers.length; i++) {
+      const p = this.providers[i];
+      const card = document.createElement('div');
+      card.className = 'provider-card';
+      card.innerHTML = `
+        <div class="provider-header">
+          <div class="provider-icon">${providerIcons[p.type] || '&#128268;'}</div>
+          <div>
+            <div class="provider-name">${this._escape(p.name)}</div>
+            <div class="provider-type"><span class="tag tag-${p.type}">${p.type}</span></div>
+          </div>
+          <div class="provider-actions">
+            <button class="icon-btn danger" title="Remove provider" onclick="App.removeProvider(${i})">&#10005;</button>
+          </div>
+        </div>
+        ${p.api_base ? `<div class="form-label" style="font-size:0.71rem;color:var(--text-muted)">&#128279; ${this._escape(p.api_base)}</div>` : ''}
+        ${p.api_key ? `<div class="form-label" style="font-size:0.71rem;color:var(--text-muted);margin-top:0.3rem">&#128273; Key configured</div>` : ''}
+      `;
+      grid.appendChild(card);
+    }
+    if (this.providers.length === 0) {
+      grid.innerHTML = '<div class="empty-state" style="padding:2rem">No providers configured yet.</div>';
+    }
+  },
+
+  _escape(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  },
+
+  // -------------------------------------------------------------------------
+  // Health
+  // -------------------------------------------------------------------------
+
+  async refreshHealth() {
+    const badge = document.getElementById('gateway-status');
+    const text  = document.getElementById('gateway-status-text');
+    badge.className = 'status-badge checking';
+    text.textContent = 'Checking…';
+
+    try {
+      const res = await fetch('/api/health');
+      const data = await res.json();
+      if (data.ok) {
+        badge.className = 'status-badge online';
+        text.textContent = 'Gateway online';
+        this._applyModelHealth(data.body);
+      } else {
+        badge.className = 'status-badge offline';
+        text.textContent = 'Gateway offline';
+      }
+    } catch {
+      badge.className = 'status-badge offline';
+      text.textContent = 'Unreachable';
+    }
+  },
+
+  /**
+   * Apply health status to individual model rows.
+   * LiteLLM's /health response has a "healthy_endpoints" and
+   * "unhealthy_endpoints" structure — we do best-effort matching.
+   */
+  _applyModelHealth(body) {
+    if (!body) return;
+    const healthy = new Set();
+    const unhealthy = new Set();
+
+    const mark = (list, set) => {
+      if (!Array.isArray(list)) return;
+      for (const ep of list) {
+        // ep.model_name or ep.litellm_params?.model
+        const name = ep.model_name || (ep.litellm_params && ep.litellm_params.model);
+        if (name) set.add(name);
+      }
+    };
+
+    mark(body.healthy_endpoints, healthy);
+    mark(body.unhealthy_endpoints, unhealthy);
+
+    // Update model health flags in our state and re-render affected dots
+    for (const tier of ConfigParser.TIERS) {
+      for (const m of this.chains[tier]) {
+        const id = m.litellm_params.model;
+        if (healthy.has(id) || healthy.has(m.model_name)) {
+          m._health = 'healthy';
+        } else if (unhealthy.has(id) || unhealthy.has(m.model_name)) {
+          m._health = 'unhealthy';
+        }
+      }
+    }
+    this.renderTiers();
+  },
+
+  // -------------------------------------------------------------------------
+  // Model mutations
+  // -------------------------------------------------------------------------
+
+  moveModel(tier, fromIdx, toIdx) {
+    const chain = this.chains[tier];
+    if (toIdx < 0 || toIdx >= chain.length) return;
+    const [item] = chain.splice(fromIdx, 1);
+    chain.splice(toIdx, 0, item);
+    this.renderTiers();
+    this.setDirty(true);
+  },
+
+  removeModel(tier, index) {
+    this.chains[tier].splice(index, 1);
+    this.renderTiers();
+    this.setDirty(true);
+  },
+
+  onChainDrop(event, tier) {
+    event.preventDefault();
+    // DnD.over already handled the move — nothing more to do here.
+  },
+
+  // -------------------------------------------------------------------------
+  // Add model modal
+  // -------------------------------------------------------------------------
+
+  showAddModelModal(tier) {
+    this._modelModalCtx = { tier };
+    document.getElementById('model-modal-title').textContent = `Add model to "${tier}" chain`;
+    // Reset form
+    document.getElementById('mm-provider').value = 'ollama';
+    document.getElementById('mm-model').value = '';
+    document.getElementById('mm-apibase').value = 'http://host.docker.internal:11434';
+    document.getElementById('mm-apikey').value = '';
+    document.getElementById('mm-timeout').value = '30';
+    document.getElementById('mm-stream').value = 'true';
+    this.onProviderChange();
+    this.openModal('model-modal');
+  },
+
+  onProviderChange() {
+    const provider = document.getElementById('mm-provider').value;
+    const apibaseGroup = document.getElementById('mm-apibase-group');
+    const apikeyGroup  = document.getElementById('mm-apikey-group');
+    const modelInput   = document.getElementById('mm-model');
+    const apibaseInput = document.getElementById('mm-apibase');
+
+    // Show/hide fields based on provider type
+    if (provider === 'ollama') {
+      apibaseGroup.style.display = '';
+      apikeyGroup.style.display  = 'none';
+      apibaseInput.value = 'http://host.docker.internal:11434';
+      modelInput.placeholder = 'e.g. ollama/gemma4:31b';
+    } else if (provider === 'openrouter') {
+      apibaseGroup.style.display = 'none';
+      apikeyGroup.style.display  = '';
+      modelInput.placeholder = 'e.g. openrouter/qwen/qwen3-coder:free';
+      // Pre-fill from existing openrouter provider if known
+      const existing = this.providers.find(p => p.type === 'openrouter');
+      if (existing && existing.api_key) {
+        document.getElementById('mm-apikey').value = existing.api_key;
+      }
+    } else if (provider === 'groq') {
+      apibaseGroup.style.display = 'none';
+      apikeyGroup.style.display  = '';
+      modelInput.placeholder = 'e.g. groq/llama3-8b-8192';
+    } else {
+      // custom
+      apibaseGroup.style.display = '';
+      apikeyGroup.style.display  = '';
+      modelInput.placeholder = 'e.g. openai/gpt-4o';
+      apibaseInput.value = '';
+    }
+  },
+
+  submitModelModal() {
+    const provider  = document.getElementById('mm-provider').value;
+    const modelId   = document.getElementById('mm-model').value.trim();
+    const apiBase   = document.getElementById('mm-apibase').value.trim();
+    const apiKey    = document.getElementById('mm-apikey').value.trim();
+    const timeout   = parseInt(document.getElementById('mm-timeout').value, 10);
+    const stream    = document.getElementById('mm-stream').value === 'true';
+
+    if (!modelId) {
+      Toast.show('Model identifier is required', 'error');
+      return;
+    }
+    if (isNaN(timeout) || timeout < 1) {
+      Toast.show('Timeout must be a positive number', 'error');
+      return;
+    }
+
+    const litellmParams = { model: modelId, stream, timeout };
+    if (apiBase) litellmParams.api_base = apiBase;
+    if (apiKey)  litellmParams.api_key  = apiKey;
+
+    const { tier } = this._modelModalCtx;
+    this.chains[tier].push({ model_name: tier, litellm_params: litellmParams });
+    this.deriveProviders();
+    this.render();
+    this.setDirty(true);
+    this.closeModal('model-modal');
+    Toast.show(`Model added to "${tier}" chain`, 'success');
+  },
+
+  // -------------------------------------------------------------------------
+  // Add provider modal
+  // -------------------------------------------------------------------------
+
+  showAddProviderModal() {
+    document.getElementById('pm-type').value = 'ollama';
+    document.getElementById('pm-name').value = '';
+    document.getElementById('pm-apibase').value = 'http://host.docker.internal:11434';
+    document.getElementById('pm-apikey').value = '';
+    this.onProviderTypeChange();
+    this.openModal('provider-modal');
+  },
+
+  onProviderTypeChange() {
+    const type = document.getElementById('pm-type').value;
+    const apibaseGroup = document.getElementById('pm-apibase-group');
+    const apikeyGroup  = document.getElementById('pm-apikey-group');
+    if (type === 'ollama') {
+      apibaseGroup.style.display = '';
+      apikeyGroup.style.display  = 'none';
+    } else if (type === 'openrouter' || type === 'groq') {
+      apibaseGroup.style.display = 'none';
+      apikeyGroup.style.display  = '';
+    } else {
+      apibaseGroup.style.display = '';
+      apikeyGroup.style.display  = '';
+    }
+  },
+
+  submitProviderModal() {
+    const type    = document.getElementById('pm-type').value;
+    const name    = document.getElementById('pm-name').value.trim();
+    const apiBase = document.getElementById('pm-apibase').value.trim();
+    const apiKey  = document.getElementById('pm-apikey').value.trim();
+
+    if (!name) {
+      Toast.show('Provider name is required', 'error');
+      return;
+    }
+    if (type === 'ollama' && !apiBase) {
+      Toast.show('API Base URL is required for Ollama', 'error');
+      return;
+    }
+    if ((type === 'openrouter' || type === 'groq') && !apiKey) {
+      Toast.show('API Key is required for this provider', 'error');
+      return;
+    }
+
+    this.providers.push({ type, name, api_base: apiBase, api_key: apiKey });
+    this.renderProviders();
+    this.closeModal('provider-modal');
+    Toast.show(`Provider "${name}" added`, 'success');
+  },
+
+  removeProvider(index) {
+    this.providers.splice(index, 1);
+    this.renderProviders();
+  },
+
+  // -------------------------------------------------------------------------
+  // YAML preview
+  // -------------------------------------------------------------------------
+
+  showYamlPreview() {
+    const cfg = ConfigParser.buildConfig(this.rawConfig, this.chains);
+    const text = Yaml.stringify(cfg);
+    document.getElementById('yaml-preview-content').textContent = text;
+    this.openModal('yaml-modal');
+  },
+
+  // -------------------------------------------------------------------------
+  // Save
+  // -------------------------------------------------------------------------
+
+  async saveConfig(restart) {
+    const saveBtn        = document.getElementById('save-btn');
+    const saveRestartBtn = document.getElementById('save-restart-btn');
+    saveBtn.disabled        = true;
+    saveRestartBtn.disabled = true;
+
+    const cfg = ConfigParser.buildConfig(this.rawConfig, this.chains);
+
+    try {
+      const res = await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ config: cfg, restart }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || 'Save failed');
+
+      // Update rawConfig so subsequent builds are based on current state
+      this.rawConfig = cfg;
+      this.setDirty(false);
+
+      if (restart && data.restarted) {
+        Toast.show('Config saved and gateway restarted', 'success');
+        // Give the container a moment to come back up before refreshing health
+        setTimeout(() => this.refreshHealth(), 5000);
+      } else if (restart && data.restartError) {
+        Toast.show('Config saved but restart failed: ' + data.restartError, 'error', 7000);
+      } else {
+        Toast.show('Config saved successfully', 'success');
+      }
+    } catch (err) {
+      Toast.show('Save failed: ' + err.message, 'error', 6000);
+    } finally {
+      saveBtn.disabled        = false;
+      saveRestartBtn.disabled = false;
+    }
+  },
+
+  discardChanges() {
+    this.parseConfig();
+    this.render();
+    this.setDirty(false);
+    Toast.show('Changes discarded', 'info');
+  },
+
+  setDirty(isDirty) {
+    this.dirty = isDirty;
+    const bar = document.getElementById('save-bar');
+    if (isDirty) {
+      bar.classList.add('visible');
+    } else {
+      bar.classList.remove('visible');
+    }
+  },
+
+  // -------------------------------------------------------------------------
+  // Modal helpers
+  // -------------------------------------------------------------------------
+
+  openModal(id) {
+    document.getElementById(id).classList.add('open');
+  },
+
+  closeModal(id) {
+    document.getElementById(id).classList.remove('open');
+  },
+};
+
+// Close modal on backdrop click
+document.querySelectorAll('.overlay').forEach(overlay => {
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) {
+      overlay.classList.remove('open');
+    }
+  });
+});
+
+// Keyboard: Escape closes any open modal
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.overlay.open').forEach(o => o.classList.remove('open'));
+  }
+});
+
+// Boot
+App.init();
+</script>
+</body>
+</html>

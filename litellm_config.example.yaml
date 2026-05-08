@@ -27,6 +27,13 @@ litellm_settings:
     - fast-3: [fast-4]
     - fast-4: [fast-5]
 
+    # VISION chain: glm-cloud → nemotron-vl → gemma31b-or → gemma31b-cloud → gemma31b-local → gemma26b-local
+    - vision: [vision-2]
+    - vision-2: [vision-3]
+    - vision-3: [vision-4]
+    - vision-4: [vision-5]
+    - vision-5: [vision-6]
+
 model_list:
   # ============================================================
   # SMART TIER - Smartest models first
@@ -55,7 +62,7 @@ model_list:
 
   - model_name: smart-4
     litellm_params:
-      model: ollama/gemma4:31b-cloud
+      model: ollama/gemma4:31b:cloud
       api_base: http://host.docker.internal:11434
       stream: true
       timeout: 30
@@ -108,7 +115,7 @@ model_list:
 
   - model_name: normal-4
     litellm_params:
-      model: ollama/gemma4:31b-cloud
+      model: ollama/gemma4:31b:cloud
       api_base: http://host.docker.internal:11434
       stream: true
       timeout: 30
@@ -130,6 +137,52 @@ model_list:
   - model_name: normal-7
     litellm_params:
       model: ollama/gemma4:e2b
+      api_base: http://host.docker.internal:11434
+      stream: true
+      timeout: 600
+
+  # ============================================================
+  # VISION TIER - Vision/multimodal capable models
+  # Priority: Ollama Cloud → OpenRouter free (VL models) → Ollama Local
+  # ============================================================
+  - model_name: vision
+    litellm_params:
+      model: ollama/glm-5.1:cloud
+      api_base: http://host.docker.internal:11434
+      stream: true
+      timeout: 30
+
+  - model_name: vision-2
+    litellm_params:
+      model: openrouter/nvidia/nemotron-nano-12b-v2-vl:free
+      api_key: "YOUR_OPENROUTER_API_KEY"
+      stream: true
+      timeout: 30
+
+  - model_name: vision-3
+    litellm_params:
+      model: openrouter/google/gemma-4-31b-it:free
+      api_key: "YOUR_OPENROUTER_API_KEY"
+      stream: true
+      timeout: 30
+
+  - model_name: vision-4
+    litellm_params:
+      model: ollama/gemma4:31b:cloud
+      api_base: http://host.docker.internal:11434
+      stream: true
+      timeout: 30
+
+  - model_name: vision-5
+    litellm_params:
+      model: ollama/gemma4:31b
+      api_base: http://host.docker.internal:11434
+      stream: true
+      timeout: 600
+
+  - model_name: vision-6
+    litellm_params:
+      model: ollama/gemma4:26b
       api_base: http://host.docker.internal:11434
       stream: true
       timeout: 600

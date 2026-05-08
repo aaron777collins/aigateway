@@ -20,13 +20,17 @@
       --text-muted:   #64748b;
       --text-dim:     #94a3b8;
 
-      /* Tier accent colours */
+      /* Tier accent colours (known chains; dynamic chains use palette) */
       --smart-glow:   #22c55e;
       --smart-dim:    rgba(34,197,94,0.12);
       --normal-glow:  #3b82f6;
       --normal-dim:   rgba(59,130,246,0.12);
       --fast-glow:    #f97316;
       --fast-dim:     rgba(249,115,22,0.12);
+      --vision-glow:  #a855f7;
+      --vision-dim:   rgba(168,85,247,0.12);
+      --voice-glow:   #ec4899;
+      --voice-dim:    rgba(236,72,153,0.12);
 
       --accent:       #6366f1;
       --accent-dim:   rgba(99,102,241,0.15);
@@ -222,14 +226,31 @@
     ----------------------------------------------------------------------- */
     .tiers-grid {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
       gap: 1.25rem;
       margin-bottom: 2rem;
     }
 
-    @media (max-width: 900px) {
+    @media (max-width: 700px) {
       .tiers-grid { grid-template-columns: 1fr; }
     }
+
+    .tier-delete-btn {
+      margin-left: 0.4rem;
+      width: 22px;
+      height: 22px;
+      border-radius: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-muted);
+      transition: var(--transition);
+      cursor: pointer;
+    }
+    .tier-delete-btn:hover { color: var(--danger); border-color: rgba(239,68,68,0.3); background: rgba(239,68,68,0.08); }
 
     /* -----------------------------------------------------------------------
        Tier card
@@ -244,18 +265,12 @@
       transition: box-shadow var(--transition);
     }
 
-    .tier-card[data-tier="smart"] {
-      border-top: 2px solid var(--smart-glow);
-      box-shadow: 0 0 30px var(--smart-dim);
-    }
-    .tier-card[data-tier="normal"] {
-      border-top: 2px solid var(--normal-glow);
-      box-shadow: 0 0 30px var(--normal-dim);
-    }
-    .tier-card[data-tier="fast"] {
-      border-top: 2px solid var(--fast-glow);
-      box-shadow: 0 0 30px var(--fast-dim);
-    }
+    .tier-card[data-tier="smart"]  { border-top: 2px solid var(--smart-glow);  box-shadow: 0 0 30px var(--smart-dim); }
+    .tier-card[data-tier="normal"] { border-top: 2px solid var(--normal-glow); box-shadow: 0 0 30px var(--normal-dim); }
+    .tier-card[data-tier="fast"]   { border-top: 2px solid var(--fast-glow);   box-shadow: 0 0 30px var(--fast-dim); }
+    .tier-card[data-tier="vision"] { border-top: 2px solid var(--vision-glow); box-shadow: 0 0 30px var(--vision-dim); }
+    .tier-card[data-tier="voice"]  { border-top: 2px solid var(--voice-glow);  box-shadow: 0 0 30px var(--voice-dim); }
+    .tier-card[data-tier="custom"] { border-top: 2px solid var(--accent);      box-shadow: 0 0 30px var(--accent-dim); }
 
     .tier-header {
       padding: 1rem 1.25rem 0.85rem;
@@ -279,6 +294,9 @@
     [data-tier="smart"]  .tier-icon { background: var(--smart-dim);  }
     [data-tier="normal"] .tier-icon { background: var(--normal-dim); }
     [data-tier="fast"]   .tier-icon { background: var(--fast-dim);   }
+    [data-tier="vision"] .tier-icon { background: var(--vision-dim); }
+    [data-tier="voice"]  .tier-icon { background: var(--voice-dim);  }
+    [data-tier="custom"] .tier-icon { background: var(--accent-dim); }
 
     .tier-label {
       font-size: 0.95rem;
@@ -289,6 +307,9 @@
     [data-tier="smart"]  .tier-label { color: var(--smart-glow);  }
     [data-tier="normal"] .tier-label { color: var(--normal-glow); }
     [data-tier="fast"]   .tier-label { color: var(--fast-glow);   }
+    [data-tier="vision"] .tier-label { color: var(--vision-glow); }
+    [data-tier="voice"]  .tier-label { color: var(--voice-glow);  }
+    [data-tier="custom"] .tier-label { color: var(--accent);      }
 
     .tier-count {
       margin-left: auto;
@@ -732,7 +753,10 @@
     <!-- Tier chain section -->
     <div class="section-header">
       <span class="section-title">&#9654; Tier Chains</span>
-      <button class="btn btn-ghost btn-sm" onclick="App.showYamlPreview()">&#128196; Preview YAML</button>
+      <div style="display:flex;gap:0.5rem">
+        <button class="btn btn-ghost btn-sm" onclick="App.showCreateChainModal()">+ New Chain</button>
+        <button class="btn btn-ghost btn-sm" onclick="App.showYamlPreview()">&#128196; Preview YAML</button>
+      </div>
     </div>
 
     <div class="tiers-grid" id="tiers-grid"></div>
@@ -864,6 +888,27 @@
   </div>
 </div>
 
+<!-- Create chain modal -->
+<div class="overlay" id="chain-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Create New Chain</span>
+      <button class="icon-btn" onclick="App.closeModal('chain-modal')">&#10005;</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Chain name</label>
+      <input class="form-input" id="cm-name" type="text" placeholder="e.g. vision, voice, code, embed..." />
+      <div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.3rem">
+        Lowercase, no spaces. This becomes the model endpoint name.
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="App.closeModal('chain-modal')">Cancel</button>
+      <button class="btn btn-primary" onclick="App.submitCreateChain()">Create</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast container -->
 <div class="toast-stack" id="toast-stack"></div>
 
@@ -963,20 +1008,36 @@ const Yaml = {
    model, and convert back before saving.
 -------------------------------------------------------------------------- */
 const ConfigParser = {
-  TIERS: ['smart', 'normal', 'fast'],
-  TIER_ICONS: { smart: '&#129504;', normal: '&#9889;', fast: '&#128640;' },
+  KNOWN_ICONS: { smart: '&#129504;', normal: '&#9889;', fast: '&#128640;', vision: '&#128065;', voice: '&#127908;', code: '&#128187;', embed: '&#128202;' },
+  PALETTE_COLORS: [
+    { glow: '#22c55e', dim: 'rgba(34,197,94,0.12)' },   // green (smart)
+    { glow: '#3b82f6', dim: 'rgba(59,130,246,0.12)' },   // blue (normal)
+    { glow: '#f97316', dim: 'rgba(249,115,22,0.12)' },   // orange (fast)
+    { glow: '#a855f7', dim: 'rgba(168,85,247,0.12)' },   // purple (vision)
+    { glow: '#ec4899', dim: 'rgba(236,72,153,0.12)' },   // pink (voice)
+    { glow: '#06b6d4', dim: 'rgba(6,182,212,0.12)' },    // cyan
+    { glow: '#eab308', dim: 'rgba(234,179,8,0.12)' },    // yellow
+    { glow: '#ef4444', dim: 'rgba(239,68,68,0.12)' },    // red
+  ],
 
-  /**
-   * Extract the ordered list of models for a single tier from the flat
-   * model_list. The first entry has model_name === tier, subsequent entries
-   * are tier-2, tier-3, etc.
-   */
+  detectChains(modelList) {
+    const chains = [];
+    const seen = new Set();
+    for (const m of modelList) {
+      const name = m.model_name;
+      const base = name.replace(/-\d+$/, '');
+      if (!seen.has(base)) {
+        seen.add(base);
+        chains.push(base);
+      }
+    }
+    return chains;
+  },
+
   extractChain(modelList, tier) {
     const chain = [];
-    // First slot
     const first = modelList.find(m => m.model_name === tier);
     if (first) chain.push(first);
-    // Numbered slots — iterate until a gap is found
     let i = 2;
     while (true) {
       const entry = modelList.find(m => m.model_name === `${tier}-${i}`);
@@ -987,25 +1048,20 @@ const ConfigParser = {
     return chain;
   },
 
-  /**
-   * Rebuild the model_list and fallbacks from the UI's three ordered chains.
-   * We preserve all non-tier models (if any exist in the original) unchanged.
-   */
-  buildConfig(original, chains) {
+  buildConfig(original, chains, tierOrder) {
     const newModelList = [];
     const newFallbacks = [];
 
-    for (const tier of this.TIERS) {
-      const models = chains[tier];
+    for (const tier of tierOrder) {
+      const models = chains[tier] || [];
       models.forEach((m, idx) => {
         const name = idx === 0 ? tier : `${tier}-${idx + 1}`;
         newModelList.push({
           model_name: name,
           litellm_params: { ...m.litellm_params },
         });
-        // Chain: tier-N → tier-(N+1)
         if (idx < models.length - 1) {
-          const nextName = idx + 1 === 1 ? `${tier}-2` : `${tier}-${idx + 2}`;
+          const nextName = `${tier}-${idx + 2}`;
           newFallbacks.push({ [name]: [nextName] });
         }
       });
@@ -1021,7 +1077,6 @@ const ConfigParser = {
     };
   },
 
-  /** Infer the provider type from a model identifier string */
   providerOf(modelId) {
     if (!modelId) return 'custom';
     if (modelId.startsWith('ollama/')) return 'ollama';
@@ -1030,9 +1085,18 @@ const ConfigParser = {
     return 'custom';
   },
 
-  /** Strip the provider prefix to get a short display label */
   shortModelId(modelId) {
     return modelId.replace(/^(ollama|openrouter|groq)\//, '');
+  },
+
+  tierColor(tier, index) {
+    const known = { smart: 0, normal: 1, fast: 2, vision: 3, voice: 4 };
+    const idx = tier in known ? known[tier] : (index % this.PALETTE_COLORS.length);
+    return this.PALETTE_COLORS[idx] || this.PALETTE_COLORS[0];
+  },
+
+  tierIcon(tier) {
+    return this.KNOWN_ICONS[tier] || '&#128279;';
   },
 };
 
@@ -1094,15 +1158,11 @@ const DnD = {
    Main Application
 -------------------------------------------------------------------------- */
 const App = {
-  // Current config (raw, as received from the API)
   rawConfig: null,
-  // Current in-memory chains: { smart: [...], normal: [...], fast: [...] }
-  chains: { smart: [], normal: [], fast: [] },
-  // Known providers (derived from config + user additions)
+  chains: {},
+  tierOrder: [],
   providers: [],
-  // Whether there are unsaved changes
   dirty: false,
-  // Pending model-modal context
   _modelModalCtx: null,
 
   // -------------------------------------------------------------------------
@@ -1131,17 +1191,19 @@ const App = {
   },
 
   parseConfig() {
-    for (const tier of ConfigParser.TIERS) {
-      this.chains[tier] = ConfigParser.extractChain(this.rawConfig.model_list || [], tier);
+    const modelList = this.rawConfig.model_list || [];
+    this.tierOrder = ConfigParser.detectChains(modelList);
+    this.chains = {};
+    for (const tier of this.tierOrder) {
+      this.chains[tier] = ConfigParser.extractChain(modelList, tier);
     }
     this.deriveProviders();
   },
 
-  /** Build a de-duplicated provider list from what's in the current chains */
   deriveProviders() {
     const seen = new Set();
     this.providers = [];
-    for (const tier of ConfigParser.TIERS) {
+    for (const tier of this.tierOrder) {
       for (const m of this.chains[tier]) {
         const p = m.litellm_params;
         const type = ConfigParser.providerOf(p.model);
@@ -1178,37 +1240,45 @@ const App = {
   renderTiers() {
     const grid = document.getElementById('tiers-grid');
     grid.innerHTML = '';
-    for (const tier of ConfigParser.TIERS) {
-      grid.appendChild(this.buildTierCard(tier));
+    for (let i = 0; i < this.tierOrder.length; i++) {
+      grid.appendChild(this.buildTierCard(this.tierOrder[i], i));
     }
   },
 
-  buildTierCard(tier) {
+  buildTierCard(tier, tierIndex) {
     const models = this.chains[tier];
     const card = document.createElement('div');
     card.className = 'tier-card';
-    card.dataset.tier = tier;
+    const knownTiers = ['smart', 'normal', 'fast', 'vision', 'voice'];
+    card.dataset.tier = knownTiers.includes(tier) ? tier : 'custom';
+    const color = ConfigParser.tierColor(tier, tierIndex);
+    if (!knownTiers.includes(tier)) {
+      card.style.borderTop = `2px solid ${color.glow}`;
+      card.style.boxShadow = `0 0 30px ${color.dim}`;
+    }
 
-    const icons = { smart: '&#129504;', normal: '&#9889;', fast: '&#128640;' };
-    const labels = { smart: 'Smart', normal: 'Normal', fast: 'Fast' };
+    const icon = ConfigParser.tierIcon(tier);
+    const label = tier.charAt(0).toUpperCase() + tier.slice(1);
+    const escapedTier = this._escape(tier);
 
     card.innerHTML = `
       <div class="tier-header">
-        <div class="tier-icon">${icons[tier]}</div>
+        <div class="tier-icon">${icon}</div>
         <div>
-          <div class="tier-label">${labels[tier]}</div>
+          <div class="tier-label" ${!knownTiers.includes(tier) ? `style="color:${color.glow}"` : ''}>${label}</div>
         </div>
         <div class="tier-count">${models.length} model${models.length !== 1 ? 's' : ''}</div>
+        <button class="tier-delete-btn" title="Delete chain" onclick="App.deleteChain('${escapedTier}')">&#128465;</button>
       </div>
       <div class="model-chain" id="chain-${tier}"
            ondragover="event.preventDefault()"
-           ondrop="App.onChainDrop(event, '${tier}')">
+           ondrop="App.onChainDrop(event, '${escapedTier}')">
         ${models.length === 0 ? '<div class="empty-state">No models in chain</div>' : ''}
         ${models.map((m, i) => this.buildModelRow(tier, m, i, models.length)).join('')}
       </div>
       <div class="tier-footer">
-        <button class="add-model-btn" onclick="App.showAddModelModal('${tier}')">
-          + Add model to ${tier} chain
+        <button class="add-model-btn" onclick="App.showAddModelModal('${escapedTier}')">
+          + Add model to ${label} chain
         </button>
       </div>
     `;
@@ -1331,7 +1401,7 @@ const App = {
     for (const m of models) {
       statusMap[m.model_name] = m.status;
     }
-    for (const tier of ConfigParser.TIERS) {
+    for (const tier of this.tierOrder) {
       for (const m of this.chains[tier]) {
         const st = statusMap[m.model_name];
         if (st === 'healthy') m._health = 'healthy';
@@ -1373,7 +1443,8 @@ const App = {
 
   showAddModelModal(tier) {
     this._modelModalCtx = { tier };
-    document.getElementById('model-modal-title').textContent = `Add model to "${tier}" chain`;
+    const label = tier.charAt(0).toUpperCase() + tier.slice(1);
+    document.getElementById('model-modal-title').textContent = `Add model to "${label}" chain`;
     // Reset form
     document.getElementById('mm-provider').value = 'ollama';
     document.getElementById('mm-model').value = '';
@@ -1572,11 +1643,49 @@ const App = {
   },
 
   // -------------------------------------------------------------------------
+  // Chain management
+  // -------------------------------------------------------------------------
+
+  showCreateChainModal() {
+    document.getElementById('cm-name').value = '';
+    this.openModal('chain-modal');
+  },
+
+  submitCreateChain() {
+    const name = document.getElementById('cm-name').value.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (!name) {
+      Toast.show('Chain name is required (lowercase letters/numbers only)', 'error');
+      return;
+    }
+    if (this.tierOrder.includes(name)) {
+      Toast.show(`Chain "${name}" already exists`, 'error');
+      return;
+    }
+    this.tierOrder.push(name);
+    this.chains[name] = [];
+    this.render();
+    this.setDirty(true);
+    this.closeModal('chain-modal');
+    Toast.show(`Chain "${name}" created — add models to it`, 'success');
+  },
+
+  deleteChain(tier) {
+    const models = this.chains[tier] || [];
+    if (models.length > 0 && !confirm(`Delete "${tier}" chain and its ${models.length} model(s)?`)) return;
+    delete this.chains[tier];
+    this.tierOrder = this.tierOrder.filter(t => t !== tier);
+    this.deriveProviders();
+    this.render();
+    this.setDirty(true);
+    Toast.show(`Chain "${tier}" deleted`, 'info');
+  },
+
+  // -------------------------------------------------------------------------
   // YAML preview
   // -------------------------------------------------------------------------
 
   showYamlPreview() {
-    const cfg = ConfigParser.buildConfig(this.rawConfig, this.chains);
+    const cfg = ConfigParser.buildConfig(this.rawConfig, this.chains, this.tierOrder);
     const text = Yaml.stringify(cfg);
     document.getElementById('yaml-preview-content').textContent = text;
     this.openModal('yaml-modal');
@@ -1592,7 +1701,7 @@ const App = {
     saveBtn.disabled        = true;
     saveRestartBtn.disabled = true;
 
-    const cfg = ConfigParser.buildConfig(this.rawConfig, this.chains);
+    const cfg = ConfigParser.buildConfig(this.rawConfig, this.chains, this.tierOrder);
 
     try {
       const res = await fetch('/api/config', {

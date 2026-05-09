@@ -125,14 +125,13 @@ function chatToCodex(body) {
     model: body.model || 'gpt-4o',
     store: false,
     stream: true,
-    instructions: instructions || undefined,
+    instructions: instructions || 'You are a helpful assistant.',
     input,
     text: { verbosity: 'medium' },
     tool_choice: 'auto',
     parallel_tool_calls: true,
   };
 
-  if (body.temperature !== undefined) codexBody.temperature = body.temperature;
   if (body.max_tokens !== undefined) codexBody.max_output_tokens = body.max_tokens;
 
   return codexBody;
@@ -327,24 +326,89 @@ async function handleChat(req, res) {
 
 // ---- Server ----
 
+const MODELS_CACHE_PATH = process.env.CODEX_MODELS_CACHE
+  || path.join(os.homedir(), '.codex', 'models_cache.json');
+
+async function fetchModelsLive(accessToken) {
+  const accountId = extractAccountId(accessToken);
+  const res = await fetch(`${CODEX_API_BASE}/models`, {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'chatgpt-account-id': accountId,
+      'User-Agent': 'aigateway-codex-proxy/1.0',
+    },
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!res.ok) throw new Error(`${res.status}`);
+  const data = await res.json();
+  return (data.models || data.data || []).map(m => ({
+    id: m.slug || m.id || m.name,
+    object: 'model',
+    owned_by: 'codex-proxy',
+  }));
+}
+
+function readModelsCacheFile() {
+  try {
+    const raw = JSON.parse(fs.readFileSync(MODELS_CACHE_PATH, 'utf8'));
+    return (raw.models || []).map(m => ({
+      id: m.slug || m.id || m.name,
+      object: 'model',
+      owned_by: 'codex-proxy',
+    }));
+  } catch { return []; }
+}
+
+async function handleModels(req, res) {
+  let models;
+  try {
+    const token = await getAccessToken();
+    models = await fetchModelsLive(token);
+    console.log(`[models] fetched ${models.length} models live`);
+  } catch (e) {
+    console.log(`[models] live fetch failed (${e.message}), using cache`);
+    models = readModelsCacheFile();
+  }
+  if (!models.length) {
+    models = [{ id: 'gpt-4o', object: 'model', owned_by: 'codex-proxy' }];
+  }
+  res.writeHead(200, { 'content-type': 'application/json' });
+  res.end(JSON.stringify({ object: 'list', data: models }));
+}
+
+async function handleHealth(req, res) {
+  const inBackoff = Date.now() < backoffUntil;
+  let authOk = false;
+  if (!inBackoff) {
+    try {
+      const token = await getAccessToken();
+      extractAccountId(token);
+      authOk = true;
+    } catch { /* token invalid or missing */ }
+  }
+  const ok = !inBackoff && authOk;
+  res.writeHead(ok ? 200 : 503, { 'content-type': 'application/json' });
+  res.end(JSON.stringify({
+    status: inBackoff ? 'backoff' : (authOk ? 'ok' : 'unhealthy'),
+    backoff_until: inBackoff ? new Date(backoffUntil).toISOString() : null,
+    backoff_remaining_min: inBackoff ? Math.ceil((backoffUntil - Date.now()) / 60000) : 0,
+  }));
+}
+
 const server = http.createServer((req, res) => {
   if (req.method === 'GET' && req.url === '/health') {
-    const inBackoff = Date.now() < backoffUntil;
-    res.writeHead(inBackoff ? 503 : 200, { 'content-type': 'application/json' });
-    res.end(JSON.stringify({
-      status: inBackoff ? 'backoff' : 'ok',
-      backoff_until: inBackoff ? new Date(backoffUntil).toISOString() : null,
-      backoff_remaining_min: inBackoff ? Math.ceil((backoffUntil - Date.now()) / 60000) : 0,
-    }));
+    handleHealth(req, res).catch(() => {
+      res.writeHead(503, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ status: 'error' }));
+    });
     return;
   }
 
   if (req.method === 'GET' && req.url === '/v1/models') {
-    res.writeHead(200, { 'content-type': 'application/json' });
-    res.end(JSON.stringify({
-      object: 'list',
-      data: [{ id: 'gpt-4o', object: 'model', owned_by: 'codex-proxy' }],
-    }));
+    handleModels(req, res).catch(() => {
+      res.writeHead(500, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ object: 'list', data: [] }));
+    });
     return;
   }
 
@@ -363,8 +427,8 @@ const server = http.createServer((req, res) => {
   res.end(JSON.stringify({ error: { message: 'Not found' } }));
 });
 
-server.listen(PORT, '127.0.0.1', () => {
-  console.log(`Codex proxy listening on 127.0.0.1:${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`Codex proxy listening on 0.0.0.0:${PORT}`);
   console.log(`  Auth: ${AUTH_PATH}`);
   console.log(`  Backoff: ${BACKOFF_MS / 60000} min on rate-limit/5xx`);
   console.log(`  Retries: NONE (single attempt per request)`);

@@ -30,7 +30,7 @@ reloadConfig();
 fs.watchFile(CONFIG_PATH, { interval: 5000 }, reloadConfig);
 
 function cleanModel(m) {
-  return m.replace(/^(ollama|openrouter|groq)\//, '');
+  return m.replace(/^[a-z_-]+\//, '');
 }
 
 function resolveModel(responseModel) {

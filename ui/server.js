@@ -207,17 +207,19 @@ app.get('/api/health/models', async (req, res) => {
     const cfg = readConfig();
     const models = (cfg.model_list || []).map(m => {
       const model = m.litellm_params?.model || '';
+      const apiBase = m.litellm_params?.api_base || '';
       const isLocal = model.startsWith('ollama/') && !model.includes(':cloud');
       const isOpenRouter = model.startsWith('openrouter/');
+      const isCustom = !isLocal && !isOpenRouter && !model.startsWith('ollama/') && apiBase;
       return {
         model_name: m.model_name,
         model: model,
         status: isLocal ? 'slow' : 'unknown',
-        provider: isLocal ? 'ollama-local' : isOpenRouter ? 'openrouter' : model.startsWith('ollama/') ? 'ollama-cloud' : 'other',
+        provider: isLocal ? 'ollama-local' : isOpenRouter ? 'openrouter' : model.startsWith('ollama/') ? 'ollama-cloud' : isCustom ? 'custom' : 'other',
+        api_base: apiBase,
       };
     });
 
-    // Quick-check a few cloud/API models with a fast timeout
     const checkPromises = models
       .filter(m => m.provider !== 'ollama-local')
       .map(async (m) => {
@@ -229,6 +231,10 @@ app.get('/api/health/models', async (req, res) => {
             url = (params.api_base || 'http://host.docker.internal:11434') + '/api/tags';
           } else if (m.provider === 'openrouter') {
             url = 'https://openrouter.ai/api/v1/models';
+            if (params.api_key) headers.Authorization = `Bearer ${params.api_key}`;
+          } else if (m.provider === 'custom' && params.api_base) {
+            const base = params.api_base.replace(/\/+$/, '').replace(/\/v1$/, '');
+            url = base + '/health';
             if (params.api_key) headers.Authorization = `Bearer ${params.api_key}`;
           } else {
             return;

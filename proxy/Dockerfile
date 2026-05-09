@@ -10,8 +10,8 @@ COPY server.js ./
 ENV LITELLM_HOST=litellm
 ENV LITELLM_PORT=4000
 ENV CONFIG_PATH=/config/litellm_config.yaml
-ENV PORT=4003
+ENV PORT=4000
 
-EXPOSE 4003
+EXPOSE 4000
 
 CMD ["node", "server.js"]

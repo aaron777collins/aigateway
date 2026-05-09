@@ -4,7 +4,7 @@ services:
     container_name: aigateway-litellm
     restart: unless-stopped
     ports:
-      - "127.0.0.1:4000:4000"
+      - "127.0.0.1:4010:4000"
     volumes:
       - ./litellm_config.yaml:/app/config.yaml:ro
     command:
@@ -33,14 +33,14 @@ services:
     container_name: aigateway-proxy
     restart: unless-stopped
     ports:
-      - "127.0.0.1:4003:4003"
+      - "127.0.0.1:4000:4000"
     volumes:
       - ./litellm_config.yaml:/config/litellm_config.yaml:ro
     environment:
       LITELLM_HOST: litellm
       LITELLM_PORT: "4000"
       CONFIG_PATH: /config/litellm_config.yaml
-      PORT: "4003"
+      PORT: "4000"
     depends_on:
       - litellm
     networks:

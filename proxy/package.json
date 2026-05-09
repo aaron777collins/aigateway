@@ -1,0 +1,15 @@
+{
+  "name": "aigateway-proxy",
+  "version": "1.0.0",
+  "description": "Reverse proxy that adds [chain/model] prefix to AI Gateway responses",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

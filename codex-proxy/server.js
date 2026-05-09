@@ -309,22 +309,41 @@ async function handleChat(req, res) {
 
   console.log(`[res] model=${result.model} chars=${result.text.length} stop=${result.stopReason}`);
 
-  // Return standard chat completion format
-  const response = {
-    id: `chatcmpl-codex-${Date.now()}`,
-    object: 'chat.completion',
-    created: Math.floor(Date.now() / 1000),
-    model: result.model || codexBody.model,
-    choices: [{
-      index: 0,
-      message: { role: 'assistant', content: result.text },
-      finish_reason: result.stopReason,
-    }],
-    usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
-  };
+  const id = `chatcmpl-codex-${Date.now()}`;
+  const ts = Math.floor(Date.now() / 1000);
+  const mdl = result.model || codexBody.model;
 
-  res.writeHead(200, { 'content-type': 'application/json' });
-  res.end(JSON.stringify(response));
+  if (body.stream) {
+    res.writeHead(200, {
+      'content-type': 'text/event-stream',
+      'cache-control': 'no-cache',
+      'connection': 'keep-alive',
+    });
+    const chunk = {
+      id, created: ts, model: mdl, object: 'chat.completion.chunk',
+      choices: [{ index: 0, delta: { role: 'assistant', content: result.text }, finish_reason: null }],
+    };
+    res.write('data: ' + JSON.stringify(chunk) + '\n\n');
+    const done = {
+      id, created: ts, model: mdl, object: 'chat.completion.chunk',
+      choices: [{ index: 0, delta: {}, finish_reason: result.stopReason }],
+    };
+    res.write('data: ' + JSON.stringify(done) + '\n\n');
+    res.write('data: [DONE]\n\n');
+    res.end();
+  } else {
+    const response = {
+      id, object: 'chat.completion', created: ts, model: mdl,
+      choices: [{
+        index: 0,
+        message: { role: 'assistant', content: result.text },
+        finish_reason: result.stopReason,
+      }],
+      usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+    };
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(JSON.stringify(response));
+  }
 }
 
 // ---- Server ----

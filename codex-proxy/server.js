@@ -341,21 +341,21 @@ async function fetchModelsLive(accessToken) {
   });
   if (!res.ok) throw new Error(`${res.status}`);
   const data = await res.json();
-  return (data.models || data.data || []).map(m => ({
-    id: m.slug || m.id || m.name,
-    object: 'model',
-    owned_by: 'codex-proxy',
-  }));
+  return (data.models || data.data || []).map(m => {
+    let id = m.slug || m.id || m.name;
+    id = id.replace(/^(gpt-)(\d+)-(\d+)/, '$1$2.$3');
+    return { id, object: 'model', owned_by: 'codex-proxy' };
+  });
 }
 
 function readModelsCacheFile() {
   try {
     const raw = JSON.parse(fs.readFileSync(MODELS_CACHE_PATH, 'utf8'));
-    return (raw.models || []).map(m => ({
-      id: m.slug || m.id || m.name,
-      object: 'model',
-      owned_by: 'codex-proxy',
-    }));
+    return (raw.models || []).map(m => {
+      let id = m.slug || m.id || m.name;
+      id = id.replace(/^(gpt-)(\d+)-(\d+)/, '$1$2.$3');
+      return { id, object: 'model', owned_by: 'codex-proxy' };
+    });
   } catch { return []; }
 }
 

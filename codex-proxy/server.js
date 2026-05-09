@@ -114,10 +114,16 @@ function chatToCodex(body) {
         : msg.content;
       input.push({ role: 'user', content });
     } else if (msg.role === 'assistant') {
+      if (msg.tool_calls) continue;
       const content = typeof msg.content === 'string'
         ? [{ type: 'output_text', text: msg.content }]
         : msg.content;
-      input.push({ role: 'assistant', content });
+      if (content && (typeof content !== 'string' || content.trim())) {
+        input.push({ role: 'assistant', content });
+      }
+    } else if (msg.role === 'tool') {
+      const text = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
+      input.push({ role: 'user', content: [{ type: 'input_text', text: `[Tool result]: ${text}` }] });
     }
   }
 
@@ -127,9 +133,6 @@ function chatToCodex(body) {
     stream: true,
     instructions: instructions || 'You are a helpful assistant.',
     input,
-    text: { verbosity: 'medium' },
-    tool_choice: 'auto',
-    parallel_tool_calls: true,
   };
 
   if (body.max_tokens !== undefined) codexBody.max_output_tokens = body.max_tokens;

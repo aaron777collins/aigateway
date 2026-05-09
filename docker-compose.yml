@@ -79,7 +79,7 @@ services:
     container_name: aigateway-codex-proxy
     restart: unless-stopped
     volumes:
-      - ${HOME}/.codex/auth.json:/root/.codex/auth.json
+      - ${HOME}/.codex:/root/.codex
     environment:
       PORT: "4020"
       CODEX_AUTH_PATH: /root/.codex/auth.json

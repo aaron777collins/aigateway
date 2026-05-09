@@ -1321,6 +1321,8 @@ const App = {
         </div>
         <div class="model-health ${healthClass}" title="Health status"></div>
         <div class="model-actions">
+          <button class="icon-btn" title="Edit model"
+            onclick="App.showEditModelModal('${tier}', ${index})">&#9998;</button>
           <button class="icon-btn" title="Move up"
             onclick="App.moveModel('${tier}', ${index}, ${index - 1})"
             ${index === 0 ? 'disabled style="opacity:.25"' : ''}>&#8679;</button>
@@ -1453,12 +1455,11 @@ const App = {
   // -------------------------------------------------------------------------
 
   showAddModelModal(tier) {
-    this._modelModalCtx = { tier };
+    this._modelModalCtx = { tier, editIndex: null };
     const label = tier.charAt(0).toUpperCase() + tier.slice(1);
     document.getElementById('model-modal-title').textContent = `Add model to "${label}" chain`;
-    // Rebuild provider dropdown with any custom providers
+    document.querySelector('#model-modal .modal-footer .btn-primary').textContent = 'Add Model';
     this._rebuildProviderDropdown();
-    // Reset form
     document.getElementById('mm-provider').value = 'ollama';
     document.getElementById('mm-model').value = '';
     document.getElementById('mm-apibase').value = 'http://host.docker.internal:11434';
@@ -1466,6 +1467,34 @@ const App = {
     document.getElementById('mm-timeout').value = '30';
     document.getElementById('mm-stream').value = 'true';
     this.onProviderChange();
+    this.openModal('model-modal');
+  },
+
+  showEditModelModal(tier, index) {
+    const model = this.chains[tier][index];
+    if (!model) return;
+    const p = model.litellm_params;
+    this._modelModalCtx = { tier, editIndex: index };
+    const label = tier.charAt(0).toUpperCase() + tier.slice(1);
+    document.getElementById('model-modal-title').textContent = `Edit model in "${label}" chain`;
+    document.querySelector('#model-modal .modal-footer .btn-primary').textContent = 'Save Changes';
+    this._rebuildProviderDropdown();
+    const provider = ConfigParser.providerOf(p.model);
+    document.getElementById('mm-provider').value = provider;
+    document.getElementById('mm-model').value = p.model || '';
+    document.getElementById('mm-apibase').value = p.api_base || '';
+    document.getElementById('mm-apikey').value = p.api_key || '';
+    document.getElementById('mm-timeout').value = p.timeout || '30';
+    document.getElementById('mm-stream').value = p.stream === false ? 'false' : 'true';
+    this.onProviderChange();
+    if (p.api_base) {
+      document.getElementById('mm-apibase-group').style.display = '';
+      document.getElementById('mm-apibase').value = p.api_base;
+    }
+    if (p.api_key) {
+      document.getElementById('mm-apikey-group').style.display = '';
+      document.getElementById('mm-apikey').value = p.api_key;
+    }
     this.openModal('model-modal');
   },
 
@@ -1634,13 +1663,18 @@ const App = {
     if (apiBase) litellmParams.api_base = apiBase;
     if (apiKey)  litellmParams.api_key  = apiKey;
 
-    const { tier } = this._modelModalCtx;
-    this.chains[tier].push({ model_name: tier, litellm_params: litellmParams });
+    const { tier, editIndex } = this._modelModalCtx;
+    if (editIndex !== null && editIndex !== undefined) {
+      this.chains[tier][editIndex].litellm_params = litellmParams;
+      Toast.show(`Model updated in "${tier}" chain`, 'success');
+    } else {
+      this.chains[tier].push({ model_name: tier, litellm_params: litellmParams });
+      Toast.show(`Model added to "${tier}" chain`, 'success');
+    }
     this.deriveProviders();
     this.render();
     this.setDirty(true);
     this.closeModal('model-modal');
-    Toast.show(`Model added to "${tier}" chain`, 'success');
   },
 
   // -------------------------------------------------------------------------

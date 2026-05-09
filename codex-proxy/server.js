@@ -9,7 +9,7 @@ const PORT = parseInt(process.env.PORT || '4020', 10);
 const AUTH_PATH = process.env.CODEX_AUTH_PATH || path.join(os.homedir(), '.codex', 'auth.json');
 const CODEX_API_BASE = 'https://chatgpt.com/backend-api';
 const TOKEN_URL = 'https://auth.openai.com/oauth/token';
-const CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann';
+const CLIENT_ID = process.env.CODEX_CLIENT_ID || '';
 const JWT_CLAIM = 'https://api.openai.com/auth';
 
 const BACKOFF_MS = 20 * 60 * 1000;

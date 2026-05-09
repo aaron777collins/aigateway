@@ -83,6 +83,7 @@ services:
     environment:
       PORT: "4020"
       CODEX_AUTH_PATH: /root/.codex/auth.json
+      CODEX_CLIENT_ID: "${CODEX_CLIENT_ID}"
     networks:
       - internal
 

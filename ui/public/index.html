@@ -1074,6 +1074,7 @@ const ConfigParser = {
         fallbacks: newFallbacks,
       },
       model_list: newModelList,
+      _gateway_providers: original._gateway_providers || [],
     };
   },
 
@@ -1203,6 +1204,16 @@ const App = {
   deriveProviders() {
     const seen = new Set();
     this.providers = [];
+    // Load explicitly saved providers first
+    const saved = this.rawConfig._gateway_providers || [];
+    for (const sp of saved) {
+      const key = (sp.type || 'custom') + ':' + (sp.api_base || sp.api_key || '');
+      if (!seen.has(key)) {
+        seen.add(key);
+        this.providers.push({ ...sp });
+      }
+    }
+    // Then derive from existing models (fills in any not explicitly saved)
     for (const tier of this.tierOrder) {
       for (const m of this.chains[tier]) {
         const p = m.litellm_params;
@@ -1445,6 +1456,8 @@ const App = {
     this._modelModalCtx = { tier };
     const label = tier.charAt(0).toUpperCase() + tier.slice(1);
     document.getElementById('model-modal-title').textContent = `Add model to "${label}" chain`;
+    // Rebuild provider dropdown with any custom providers
+    this._rebuildProviderDropdown();
     // Reset form
     document.getElementById('mm-provider').value = 'ollama';
     document.getElementById('mm-model').value = '';
@@ -1454,6 +1467,40 @@ const App = {
     document.getElementById('mm-stream').value = 'true';
     this.onProviderChange();
     this.openModal('model-modal');
+  },
+
+  _rebuildProviderDropdown() {
+    const sel = document.getElementById('mm-provider');
+    sel.innerHTML = '';
+    const builtins = [
+      { value: 'ollama', label: 'Ollama (local)' },
+      { value: 'openrouter', label: 'OpenRouter' },
+      { value: 'groq', label: 'Groq' },
+    ];
+    for (const b of builtins) {
+      const opt = document.createElement('option');
+      opt.value = b.value;
+      opt.textContent = b.label;
+      sel.appendChild(opt);
+    }
+    // Add custom providers from the saved list
+    const seen = new Set(['ollama', 'openrouter', 'groq']);
+    for (let i = 0; i < this.providers.length; i++) {
+      const p = this.providers[i];
+      const key = p.type + ':' + (p.api_base || p.api_key || '');
+      if (p.type === 'custom' && !seen.has(key)) {
+        seen.add(key);
+        const opt = document.createElement('option');
+        opt.value = `_custom_${i}`;
+        opt.textContent = p.name || 'Custom';
+        sel.appendChild(opt);
+      }
+    }
+    // Always keep a generic custom option at the end
+    const generic = document.createElement('option');
+    generic.value = 'custom';
+    generic.textContent = 'Custom / OpenAI-compatible';
+    sel.appendChild(generic);
   },
 
   _availableModels: [],
@@ -1524,6 +1571,21 @@ const App = {
     const apikeyGroup  = document.getElementById('mm-apikey-group');
     const modelInput   = document.getElementById('mm-model');
     const apibaseInput = document.getElementById('mm-apibase');
+    const apikeyInput  = document.getElementById('mm-apikey');
+
+    // Handle saved custom provider selection
+    if (provider.startsWith('_custom_')) {
+      const idx = parseInt(provider.slice(8), 10);
+      const p = this.providers[idx];
+      if (p) {
+        apibaseGroup.style.display = p.api_base ? '' : 'none';
+        apikeyGroup.style.display  = '';
+        apibaseInput.value = p.api_base || '';
+        apikeyInput.value = p.api_key || '';
+        modelInput.placeholder = `e.g. openai/gpt-4o (via ${p.name})`;
+        return;
+      }
+    }
 
     // Show/hide fields based on provider type
     if (provider === 'ollama') {
@@ -1535,17 +1597,15 @@ const App = {
       apibaseGroup.style.display = 'none';
       apikeyGroup.style.display  = '';
       modelInput.placeholder = 'e.g. openrouter/qwen/qwen3-coder:free';
-      // Pre-fill from existing openrouter provider if known
       const existing = this.providers.find(p => p.type === 'openrouter');
       if (existing && existing.api_key) {
-        document.getElementById('mm-apikey').value = existing.api_key;
+        apikeyInput.value = existing.api_key;
       }
     } else if (provider === 'groq') {
       apibaseGroup.style.display = 'none';
       apikeyGroup.style.display  = '';
       modelInput.placeholder = 'e.g. groq/llama3-8b-8192';
     } else {
-      // custom
       apibaseGroup.style.display = '';
       apikeyGroup.style.display  = '';
       modelInput.placeholder = 'e.g. openai/gpt-4o';
@@ -1632,14 +1692,25 @@ const App = {
     }
 
     this.providers.push({ type, name, api_base: apiBase, api_key: apiKey });
+    this._syncProvidersToConfig();
     this.renderProviders();
     this.closeModal('provider-modal');
+    this.setDirty(true);
     Toast.show(`Provider "${name}" added`, 'success');
   },
 
   removeProvider(index) {
     this.providers.splice(index, 1);
+    this._syncProvidersToConfig();
     this.renderProviders();
+    this.setDirty(true);
+  },
+
+  _syncProvidersToConfig() {
+    if (!this.rawConfig) return;
+    this.rawConfig._gateway_providers = this.providers.map(p => ({
+      type: p.type, name: p.name, api_base: p.api_base, api_key: p.api_key,
+    }));
   },
 
   // -------------------------------------------------------------------------
